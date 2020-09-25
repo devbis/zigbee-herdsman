@@ -91,18 +91,20 @@ export default class ZiGateFrame {
     constructor(frame?: Buffer) {
         if (frame !== undefined) {
             const decodedFrame = decodeFrame(frame);
-            debug.log(`new from buffer: %o`, decodedFrame);
+            debug.log(`decoded frame >>> %o`, decodedFrame);
             // Due to ZiGate incoming frames with erroneous msg length
             this.msgLengthOffset = -1;
 
             if (!ZiGateFrame.isValid(frame)) {
                 debug.error('Provided frame is not a valid ZiGate frame.');
+                return;
             }
 
             this.buildChunks(decodedFrame);
 
             if (this.readChecksum() !== this.calcChecksum()) {
                 debug.error(`Provided frame has an invalid checksum.`);
+                return;
             }
         }
     }
@@ -134,20 +136,25 @@ export default class ZiGateFrame {
     }
 
     toBuffer(): Buffer {
-        const length = 7 + this.rssiBytes.length + this.readMsgLength();
+        const length = 5 + this.readMsgLength();
 
-        return this.escapeData(Buffer.concat(
+        const escapedData = this.escapeData(Buffer.concat(
             [
-                // Uint8Array.from([ZiGateFrame.START_BYTE]),
                 this.msgCodeBytes,
                 this.msgLengthBytes,
                 this.checksumBytes,
                 this.msgPayloadBytes,
-                this.rssiBytes,
-                // Uint8Array.from([ZiGateFrame.STOP_BYTE]),
             ],
             length,
-        ));
+        ))
+
+        return Buffer.concat(
+            [
+                Uint8Array.from([ZiGateFrame.START_BYTE]),
+                escapedData,
+                Uint8Array.from([ZiGateFrame.STOP_BYTE]),
+            ]
+        );
     }
 
     escapeData(data: Buffer): Buffer {

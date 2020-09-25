@@ -7,7 +7,9 @@ import {Direction, FrameType, ZclFrame} from '../../../zcl';
 import {Queue, Waitress} from '../../../utils';
 import Driver from '../driver/zigate';
 import {Debug} from "../debug";
-import {BOOLEAN, ZiGateCommandCode} from "../driver/constants";
+import {ZiGateCommandCode} from "../driver/constants";
+import {RawAPSDataRequestPayload} from "../driver/commandType";
+import ZiGateObject from "../driver/ziGateObject";
 
 const debug = Debug('adapter');
 
@@ -39,14 +41,53 @@ class ZiGateAdapter extends Adapter {
         super(networkOptions, serialPortOptions, backupPath, adapterOptions);
 
         debug.log('construct', arguments);
+
+        this.joinPermitted = false;
         this.driver = new Driver(serialPortOptions.path, serialPortOptions);
+        // Подписка на события
         // Обнуляем переменные
         this.waitress = new Waitress<Events.ZclDataPayload, WaitressMatcher>(
             this.waitressValidator, this.waitressTimeoutFormatter
         );
+        this.driver.on('received', (data: any) => {
+            const payload: Events.ZclDataPayload = {
+                address: data.ziGateObject.payload.sourceAddress,
+                frame: data.zclFrame,
+                endpoint: data.ziGateObject.payload.sourceEndpoint,
+                linkquality: data.ziGateObject.frame.readRSSI(),
+                groupID: 0,
+            };
+            this.emit(Events.Events.zclData, payload)
+        });
 
-        // Подписка на события
-        this.driver.on('receivedData', this.onRecievedData.bind(this));
+        this.driver.on('receivedRaw', (data: any) => {
+            debug.error(data);
+        });
+
+        this.driver.on('LeaveIndication', (data: any) => {
+            debug.log(data);
+            const payload: Events.DeviceLeavePayload = {
+                networkAddress: data.ziGateObject.payload.extendedAddress,
+                ieeeAddr: data.ziGateObject.payload.extendedAddress
+            };
+            this.emit(Events.Events.deviceLeave, payload)
+        });
+
+        this.driver.on('DeviceAnnounce', (data: any) => {
+            const payload: Events.DeviceAnnouncePayload = {
+                networkAddress: data.ziGateObject.payload.shortAddress,
+                ieeeAddr: data.ziGateObject.payload.ieee
+            };
+            debug.log(data.ziGateObject.payload);
+            debug.log(payload);
+            debug.log(this.joinPermitted);
+            if (this.joinPermitted === true) {
+                this.emit(Events.Events.deviceJoined, payload)
+            } else {
+                this.emit(Events.Events.deviceAnnounce, payload)
+            }
+        });
+
     }
 
     /**
@@ -55,20 +96,26 @@ class ZiGateAdapter extends Adapter {
     public async start(): Promise<TsType.StartResult> {
         debug.log('start', arguments)
         // открываем адаптер, пробуем пингануть
-        this.driver.open()
-            .then(() => {
+        await this.driver.open()
+            .then(async () => {
                 debug.log("well connected to zigate key.", arguments);
+                // await this.driver.sendCommand(ZiGateCommandCode.SetDeviceType, {deviceType: 0});
 
-                // @TODO получаем версию
-                this.driver.sendCommand(ZiGateCommandCode.GetVersion, {});
-                this.driver.sendCommand(ZiGateCommandCode.RawMode, {enabled: 0x01}); // Включаем raw mode
-                // this.driver.sendCommand(ZiGateCommandCode.RawMode, {enabled: 0x00});
-                this.driver.sendCommand(ZiGateCommandCode.PermitJoin, {
-                    targetShortAddress: 0,
-                    interval: 254,
-                    TCsignificance: 0
-                });
-                this.driver.sendCommand(ZiGateCommandCode.PermitJoinStatus, {});
+                await this.driver.sendCommand(ZiGateCommandCode.RawMode, {enabled: 0x01}); // Включаем raw mode
+                // await this.driver.sendCommand(ZiGateCommandCode.RawMode, {enabled: 0x02}); //  raw hybrid mode
+
+
+                // @ts-ignore
+                await this.driver.sendCommand(ZiGateCommandCode.SetChannelMask, {channelMask: [11, 12, 16]});
+
+                await this.driver.sendCommand(ZiGateCommandCode.StartNetwork, {});
+                await this.driver.sendCommand(ZiGateCommandCode.StartNetworkScan, {});
+
+                await this.driver.sendCommand(ZiGateCommandCode.GetNetworkState, {});
+
+                //
+                // await this.reset('hard');
+
             })
             .catch((error: string) => {
                 debug.error("dont connected to zigate key");
@@ -128,16 +175,29 @@ class ZiGateAdapter extends Adapter {
 
     };
 
-    public getCoordinatorVersion(): Promise<TsType.CoordinatorVersion> {
+    public async getCoordinatorVersion(): Promise<TsType.CoordinatorVersion> {
         debug.log('getCoordinatorVersion', arguments)
-        // return this.driver.version;
+        // @ts-ignore
+        const result: ZiGateObject = await this.driver.sendCommand(ZiGateCommandCode.GetVersion, {});
+        const version: TsType.CoordinatorVersion = {
+            type: 'zigate',
+            meta: {'major': result.payload.installerVersion.toString(16)}
+        };
         return new Promise((resolve) => {
-            resolve()
+            resolve(version)
         })
     };
 
     public reset(type: 'soft' | 'hard'): Promise<void> {
         debug.log('reset', type, arguments)
+
+        if (type === 'soft') {
+            this.driver.sendCommand(ZiGateCommandCode.Reset, {});
+        } else if (type === 'hard') {
+            this.driver.sendCommand(ZiGateCommandCode.ErasePersistentData, {});
+            this.driver.sendCommand(ZiGateCommandCode.Reset, {});
+        }
+
         return
     };
 
@@ -170,23 +230,33 @@ class ZiGateAdapter extends Adapter {
 
     public setTransmitPower(value: number): Promise<void> {
         debug.log('setTransmitPower', arguments)
+        // this.driver.sendCommand(0x0806, {value: value});
         return
     };
 
     /**
      * ZDO
      */
-    public permitJoin(seconds: number, networkAddress: number): Promise<void> {
-        return
-        // return this.driver.sendCommand(ZiGateCommandCode.PermitJoin, {
-        //     targetShortAddress: networkAddress ?? 0xFFFC,
-        //     interval: seconds,
-        //     TCsignificance: 0
-        // });
+    public async permitJoin(seconds: number, networkAddress: number): Promise<void> {
+
+        await this.driver.sendCommand(ZiGateCommandCode.PermitJoin, {
+            targetShortAddress: networkAddress || 0,
+            interval: seconds,
+            TCsignificance: 0
+        });
+
+        if (seconds === 0) {
+            this.joinPermitted = false;
+        } else {
+            this.joinPermitted = true;
+        }
+        await this.driver.sendCommand(ZiGateCommandCode.PermitJoinStatus, {});
+
     };
 
     public lqi(networkAddress: number): Promise<TsType.LQI> {
         debug.log('lqi', arguments)
+        this.driver.sendCommand(0x004E, {targetAddress: networkAddress, startIndex: 0});
         return
     };
 
@@ -208,28 +278,31 @@ class ZiGateAdapter extends Adapter {
 
     public activeEndpoints(networkAddress: number): Promise<TsType.ActiveEndpoints> {
         debug.log('ActiveEndpoints', arguments)
-        // let res: TsType.ActiveEndpoints = {
-        //  endpoints: [
-        //      1,
-        //      2
-        //  ]
-        // };
-        return new Promise((resolve) => {
-            resolve()
+        const payload = {
+            targetShortAddress: networkAddress
+        }
+        debug.log('ActiveEndpoints', payload)
+
+        return new Promise(async (resolve) => {
+            const result = await this.driver.sendCommand(ZiGateCommandCode.ActiveEndpoint, payload);
+            debug.error(result);
+            // @ts-ignore
+            resolve(result)
         });
     };
 
     public simpleDescriptor(networkAddress: number, endpointID: number): Promise<TsType.SimpleDescriptor> {
         debug.log('SimpleDescriptor', arguments)
-        // let res: TsType.SimpleDescriptor = {
-        //     profileID: 1,
-        //     endpointID: endpointID,
-        //     deviceID: 1,
-        //     inputClusters: [1],
-        //     outputClusters: []
-        // };
+
+        const payload = {
+            targetShortAddress: networkAddress,
+            endpoint: endpointID
+        }
+        debug.log('SimpleDescriptor', payload)
+
         return new Promise((resolve) => {
-            resolve()
+            // @ts-ignore
+            resolve(this.driver.sendCommand(ZiGateCommandCode.SimpleDescriptor, payload))
         });
     };
 
@@ -274,8 +347,27 @@ class ZiGateAdapter extends Adapter {
 
     public sendZclFrameToAll(endpoint: number, zclFrame: ZclFrame, sourceEndpoint: number): Promise<void> {
         // this.driver.sendCommand()
-        debug.log('sendZclFrameToAll', arguments)
-        return
+        // debug.log('sendZclFrameToAll', arguments)
+        // @ts-ignore
+        let pay = zclFrame.toBuffer();
+
+        // @ts-ignore
+        const payload: RawAPSDataRequestPayload = {
+            addressMode: 0x02, //nwk
+            targetShortAddress: 0,
+            sourceEndpoint: sourceEndpoint,
+            destinationEndpoint: endpoint,
+            profileID: 0x0104,
+            clusterID: zclFrame.Cluster.ID,
+            securityMode: 0,
+            radius: 30,
+            dataLength: pay.length,
+            data: pay,
+        }
+        debug.log('sendZclFrameToAll', payload)
+
+        // this.driver.sendCommand(ZiGateCommandCode.RawAPSDataRequest, payload);
+        return;
     };
 
     /**

@@ -1,7 +1,7 @@
 import {Buffalo, TsType as BuffaloTsType, TsType} from '../../../buffalo';
 import {Options, Value} from "../../../buffalo/tstype";
-import ParameterType from "./parameterType";
 import {Debug} from "../debug";
+import {IsNumberArray} from "../../../utils";
 
 const debug = Debug('driver:bufaloZiGate');
 
@@ -12,50 +12,75 @@ export interface BuffaloZiGateOptions extends BuffaloTsType.Options {
 class BuffaloZiGate extends Buffalo {
     public write(type: string, value: Value, options: Options): void {
 
-        debug.log(type,value );
-        if (type === ParameterType[ParameterType.MACCAPABILITY]) {
+        if (type === 'MACCAPABILITY') {
 
-        }
-        if (type === ParameterType[ParameterType.RAW]) {
-            this.buffer.set(value, this.position)
+        } else if (type === 'RAW') {
+            this.buffer.set(value, this.position);
             this.position++;
-        } else if (type === ParameterType[ParameterType.ADDRESS_WITH_TYPE_DEPENDENCY]) {
+        } else if (type === 'UINT16BE') {
+            this.buffer.writeUInt16BE(value, this.position);
+            this.position += 2;
+        } else if (type === 'ADDRESS_WITH_TYPE_DEPENDENCY') {
 
+        } else if (type === 'BUFFER' && (Buffer.isBuffer(value) || IsNumberArray(value))) {
+            this.writeBuffer(value, value.length);
         } else {
             super.write(type, value, options);
         }
     }
 
     public read(type: string, options: BuffaloZiGateOptions): TsType.Value {
-        if (type === ParameterType[ParameterType.MACCAPABILITY]) {
-            // rep.mac = reader.nextUInt8();
+        if (type === 'MACCAPABILITY') {
+            const result: { [k: string]: boolean | number } = {};
+            const mac = this.readUInt8();
             //
-            // rep.alternatePanCoordinator = !!(rep.mac & 0b00000001);
+            result.alternatePanCoordinator = !!(mac.mac & 0b00000001);
             // bit 0: Alternative PAN Coordinator, always 0
-            // rep.fullFunctionDevice = !!(rep.mac &      0b00000010);
+            result.fullFunctionDevice = !!(mac.mac & 0b00000010);
             // bit 1: Device Type, 1 = FFD , 0 = RFD ; cf. https://fr.wikipedia.org/wiki/IEEE_802.15.4
-            // rep.mainsPowerSource = !!(rep.mac &        0b00000100);
+            result.mainsPowerSource = !!(mac.mac & 0b00000100);
             // bit 2: Power Source, 1 = mains power, 0 = other
-            // rep.receiverOnWhenIdle = !!(rep.mac &      0b00001000);
+            result.receiverOnWhenIdle = !!(mac.mac & 0b00001000);
             // bit 3: Receiver on when Idle, 1 = non-sleepy, 0 = sleepy
-            // rep.reserved = (rep.mac &                  0b00110000) >> 4;
+            result.reserved = (mac.mac & 0b00110000) >> 4;
             // bit 4&5: Reserved
-            // rep.securityCapability = !!(rep.mac &      0b01000000);
+            result.securityCapability = !!(mac.mac & 0b01000000);
             // bit 6: Security capacity, always 0 (standard security)
-            // rep.allocateAddress = !!(rep.mac &         0b10000000);
+            result.allocateAddress = !!(mac.mac & 0b10000000);
             // bit 7: 1 = joining device must be issued network address
 
-            return this.readUInt8();
-        } else if (type === ParameterType[ParameterType.ADDRESS_WITH_TYPE_DEPENDENCY]) {
+            return result;
+        } else if (type === 'UINT16BE') {
+            return this.readUInt16BE();
+        } else if (type === 'ADDRESS_WITH_TYPE_DEPENDENCY') {
             // 		rep.addressSourceMode = Enum.ADDRESS_MODE(reader.nextUInt8());
             // 		rep.addressSource = rep.addressSourceMode.name === 'short' ?
             // 		reader.nextUInt16BE() : reader.nextBuffer(8).toString('hex');
-
-            return this.readUInt16();
+            //
+            const addressMode = this.buffer.readUInt8(this.position - 1);
+            return addressMode == 3 ? this.readIeeeAddr() : this.readUInt16BE();
+        } else if (type === 'BUFFER_RAW') {
+            const buffer = this.buffer.slice(this.position);
+            this.position += buffer.length;
+            return buffer;
         } else {
             return super.read(type, options);
         }
     }
+
+
+    public writeUInt16BE(): Value {
+        const value = this.buffer.writeUInt16BE(this.position);
+        this.position += 2;
+        return value;
+    }
+
+    public readUInt16BE(): Value {
+        const value = this.buffer.readUInt16BE(this.position);
+        this.position += 2;
+        return value;
+    }
+
 }
 
 export default BuffaloZiGate;
