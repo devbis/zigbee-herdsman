@@ -23,6 +23,11 @@ interface WaitressMatcher {
     direction: number;
 }
 
+const channelsToMask = (channels: number[]): number =>
+    channels.map((x) => 2 ** x).reduce(
+        (acc, x) => acc + x, 0);
+
+
 class ZiGateAdapter extends Adapter {
     private driver: Driver;
     private queue: Queue;
@@ -106,7 +111,10 @@ class ZiGateAdapter extends Adapter {
 
 
                 // @ts-ignore
-                await this.driver.sendCommand(ZiGateCommandCode.SetChannelMask, {channelMask: [11, 12, 16]});
+                await this.driver.sendCommand(
+                    ZiGateCommandCode.SetChannelMask,
+                    {channelMask: channelsToMask([11, 12, 16])},
+                );
 
                 await this.driver.sendCommand(ZiGateCommandCode.StartNetwork, {});
                 await this.driver.sendCommand(ZiGateCommandCode.StartNetworkScan, {});
