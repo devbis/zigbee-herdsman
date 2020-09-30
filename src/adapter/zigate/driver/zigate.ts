@@ -27,31 +27,8 @@ interface WaitressMatcher {
     commandCode?: number;
 }
 
-function DecimalHexTwosComplement(decimal: number) {
-    let size = 4;
-
-    if (decimal >= 0) {
-        let hexadecimal = decimal.toString(16);
-
-        while ((hexadecimal.length % size) != 0) {
-            hexadecimal = "" + 0 + hexadecimal;
-        }
-
-        return hexadecimal;
-    } else {
-        let hexadecimal = Math.abs(decimal).toString(16);
-        while ((hexadecimal.length % size) != 0) {
-            hexadecimal = "" + 0 + hexadecimal;
-        }
-
-        let output = '';
-        for (let i = 0; i < hexadecimal.length; i++) {
-            output += (0x0F - parseInt(hexadecimal[i], 16)).toString(16);
-        }
-
-        output = (0x01 + parseInt(output, 16)).toString(16);
-        return output;
-    }
+function zeroPad(number: number, size?: number): string {
+    return (number).toString(16).padStart(size || 4, '0');
 }
 
 export default class ZiGate extends EventEmitter {
@@ -127,13 +104,14 @@ export default class ZiGate extends EventEmitter {
     }
 
     public async sendCommand(code: ZiGateCommandCode, payload?: ZiGateObjectPayload): Promise<void | ZiGateObject> { // @TODO ?
-
-        const argument = arguments;
+        // const argument = arguments;
         return this.queue.execute(async () => {
             try {
-                debug.log('Send command \x1b[42m>>>> ' + ZiGateCommandCode[code] + ' 0x' + DecimalHexTwosComplement(code)
-                    + ' <<<<\x1b[0m ');
-                debug.log('payload: ', argument[1]);
+                debug.log(
+                    'Send command \x1b[42m>>>> ' + ZiGateCommandCode[code] + ' 0x' + zeroPad(code)
+                    + ' <<<<\x1b[0m ',
+                );
+                debug.log('payload: ', payload);
 
                 const ziGateObject = ZiGateObject.createRequest(code, payload);
                 const frame = ziGateObject.toZiGateFrame();
@@ -144,10 +122,9 @@ export default class ZiGate extends EventEmitter {
                 let waiter;
                 if (ziGateObject.command.wait_response) {
                     waiter = this.waitress.waitFor({
-                            responseType: ziGateObject.command.wait_response,
-                            commandCode: ziGateObject.code
-                        }, timeouts.default
-                    );
+                        responseType: ziGateObject.command.wait_response,
+                        commandCode: ziGateObject.code
+                    }, timeouts.default);
                 } else if (ziGateObject.command.wait_status) {
                     waiter = this.waitress.waitFor(
                         {responseType: 0x8000, commandCode: ziGateObject.code},
@@ -274,7 +251,7 @@ export default class ZiGate extends EventEmitter {
             let msgName;
             try {
                 msgName = ZiGateMessageCode[code] ? ZiGateMessageCode[code] : '';
-                msgName += ' 0x' + DecimalHexTwosComplement(code);
+                msgName += ' 0x' + zeroPad(code);
             } catch (e) {
 
             }
