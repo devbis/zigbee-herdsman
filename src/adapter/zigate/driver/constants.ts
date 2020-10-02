@@ -233,3 +233,15 @@ export enum ZiGateMessageCode {
 export interface ZiGateObjectPayload {
     [key: string]: string | number | boolean
 }
+
+export enum ZPSNwkKeyState {
+    ZPS_ZDO_NO_NETWORK_KEY,
+    ZPS_ZDO_PRECONFIGURED_LINK_KEY,
+    ZPS_ZDO_DISTRIBUTED_LINK_KEY,
+    ZPS_ZDO_PRECONFIGURED_INSTALLATION_CODE,
+}
+
+export enum ZPSNwkKeyType {
+    ZPS_APS_UNIQUE_LINK_KEY,                 /*Initial key*/
+    ZPS_APS_GLOBAL_LINK_KEY,
+}

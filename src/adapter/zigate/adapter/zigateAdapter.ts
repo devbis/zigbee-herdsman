@@ -7,7 +7,7 @@ import {Direction, FrameType, ZclFrame} from '../../../zcl';
 import {Queue, Waitress} from '../../../utils';
 import Driver from '../driver/zigate';
 import {Debug} from "../debug";
-import {ZiGateCommandCode} from "../driver/constants";
+import {ZiGateCommandCode, ZPSNwkKeyState} from "../driver/constants";
 import {RawAPSDataRequestPayload} from "../driver/commandType";
 import ZiGateObject from "../driver/ziGateObject";
 
@@ -94,6 +94,31 @@ class ZiGateAdapter extends Adapter {
         });
 
     }
+    /**
+     * Supplementary functions
+     */
+
+
+    private async initNetwork(): Promise<void> {
+
+        await this.driver.sendCommand(
+            ZiGateCommandCode.SetChannelMask,
+            {channelMask: channelsToMask(this.networkOptions.channelList)},
+        );
+        await this.driver.sendCommand(
+            ZiGateCommandCode.SetSecurityStateKey,
+            {
+                keyType: this.networkOptions.networkKeyDistribute ?
+                    ZPSNwkKeyState.ZPS_ZDO_DISTRIBUTED_LINK_KEY:
+                    ZPSNwkKeyState.ZPS_ZDO_PRECONFIGURED_LINK_KEY,
+                key: Buffer.from(this.networkOptions.networkKey).toString(),
+            },
+        );
+
+        await this.driver.sendCommand(ZiGateCommandCode.StartNetwork, {});
+        await this.driver.sendCommand(ZiGateCommandCode.StartNetworkScan, {});
+    }
+
 
     /**
      * Adapter methods
@@ -101,34 +126,19 @@ class ZiGateAdapter extends Adapter {
     public async start(): Promise<TsType.StartResult> {
         debug.log('start', arguments)
         // открываем адаптер, пробуем пингануть
-        await this.driver.open()
-            .then(async () => {
-                debug.log("well connected to zigate key.", arguments);
-                // await this.driver.sendCommand(ZiGateCommandCode.SetDeviceType, {deviceType: 0});
+        await this.driver.open();
+        try {
+            debug.log("well connected to zigate key.", arguments);
+            // await this.driver.sendCommand(ZiGateCommandCode.SetDeviceType, {deviceType: 0});
 
-                await this.driver.sendCommand(ZiGateCommandCode.RawMode, {enabled: 0x01}); // Включаем raw mode
-                // await this.driver.sendCommand(ZiGateCommandCode.RawMode, {enabled: 0x02}); //  raw hybrid mode
+            await this.driver.sendCommand(ZiGateCommandCode.RawMode, {enabled: 0x01}); // Включаем raw mode
+            // await this.driver.sendCommand(ZiGateCommandCode.RawMode, {enabled: 0x02}); //  raw hybrid mode
 
-
-                // @ts-ignore
-                await this.driver.sendCommand(
-                    ZiGateCommandCode.SetChannelMask,
-                    {channelMask: channelsToMask([11, 12, 16])},
-                );
-
-                await this.driver.sendCommand(ZiGateCommandCode.StartNetwork, {});
-                await this.driver.sendCommand(ZiGateCommandCode.StartNetworkScan, {});
-
-                await this.driver.sendCommand(ZiGateCommandCode.GetNetworkState, {});
-
-                //
-                // await this.reset('hard');
-
-            })
-            .catch((error: string) => {
-                debug.error("dont connected to zigate key");
-                debug.error(error);
-            });
+            await this.initNetwork();
+        } catch(error) {
+            debug.error("dont connected to zigate key");
+            debug.error(error);
+        }
 
         // Выставляем настройки конкуренции в очереди
         const concurrent = this.adapterOptions && this.adapterOptions.concurrent ?
@@ -253,18 +263,13 @@ class ZiGateAdapter extends Adapter {
             TCsignificance: 0
         });
 
-        if (seconds === 0) {
-            this.joinPermitted = false;
-        } else {
-            this.joinPermitted = true;
-        }
+        this.joinPermitted = seconds !== 0;
         await this.driver.sendCommand(ZiGateCommandCode.PermitJoinStatus, {});
-
     };
 
     public lqi(networkAddress: number): Promise<TsType.LQI> {
         debug.log('lqi', arguments)
-        this.driver.sendCommand(0x004E, {targetAddress: networkAddress, startIndex: 0});
+        this.driver.sendCommand(ZiGateCommandCode.ManagementLQI, {targetAddress: networkAddress, startIndex: 0});
         return
     };
 
@@ -450,6 +455,5 @@ class ZiGateAdapter extends Adapter {
 
     }
 }
-
 
 export default ZiGateAdapter;
