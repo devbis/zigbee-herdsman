@@ -88,7 +88,7 @@ export const ZiGateCommand: { [key: string]: ZiGateCommandType } = {
     [ZiGateCommandCode.SetSecurityStateKey]: { // 0x0022
         request: [
             {name: 'keyType', parameterType: 'UINT8'}, // 	<key type: uint8_t>
-            {name: 'key', parameterType: 'DATA'}, //   <key: data>
+            {name: 'key', parameterType: 'BUFFER'}, //   <key: data>
 
         ],
         wait_status: true,
@@ -108,7 +108,7 @@ export const ZiGateCommand: { [key: string]: ZiGateCommandType } = {
     },
     [ZiGateCommandCode.SetExtendedPANID]: {
         request: [
-            {name: 'panId', parameterType: 'IEEEADDR'}, //<64-bit Extended PAN ID:uint64_t>
+            {name: 'panId', parameterType: 'BUFFER'}, //<64-bit Extended PAN ID:uint64_t>
         ],
         wait_status: true,
         wait_response: false

@@ -101,17 +101,20 @@ class ZiGateAdapter extends Adapter {
 
     private async initNetwork(): Promise<void> {
 
+        debug.log(`Set channel mask ${this.networkOptions.channelList} key`);
         await this.driver.sendCommand(
             ZiGateCommandCode.SetChannelMask,
             {channelMask: channelsToMask(this.networkOptions.channelList)},
         );
+        debug.log(`Set security key`);
+
         await this.driver.sendCommand(
             ZiGateCommandCode.SetSecurityStateKey,
             {
                 keyType: this.networkOptions.networkKeyDistribute ?
                     ZPSNwkKeyState.ZPS_ZDO_DISTRIBUTED_LINK_KEY:
                     ZPSNwkKeyState.ZPS_ZDO_PRECONFIGURED_LINK_KEY,
-                key: Buffer.from(this.networkOptions.networkKey).toString(),
+                key: this.networkOptions.networkKey,
             },
         );
 
@@ -119,8 +122,9 @@ class ZiGateAdapter extends Adapter {
         await this.driver.sendCommand(ZiGateCommandCode.StartNetworkScan, {});
 
         // set EPID from config
+        debug.log(`Set EPanID ${this.networkOptions.extendedPanID}`);
         await this.driver.sendCommand(ZiGateCommandCode.SetExtendedPANID, {
-            panId: Buffer.from(this.networkOptions.extendedPanID).toString(),
+            panId: this.networkOptions.extendedPanID,
         });
 
     }

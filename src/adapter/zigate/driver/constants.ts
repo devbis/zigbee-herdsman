@@ -231,7 +231,7 @@ export enum ZiGateMessageCode {
     GetTimeServer = 0x8017,
 }
 export interface ZiGateObjectPayload {
-    [key: string]: string | number | boolean
+    [key: string]: string | number | boolean | number[]
 }
 
 export enum ZPSNwkKeyState {
