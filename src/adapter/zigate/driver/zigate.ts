@@ -11,7 +11,7 @@ import {ZiGateCommandCode, ZiGateMessageCode, ZiGateObjectPayload} from "./const
 import ZiGateObject from "./ziGateObject";
 import {ZclFrame} from "../../../zcl";
 import Waitress from "../../../utils/waitress";
-import {ZiGateCommand} from "./commandType";
+import {ZiGateResponseMatcher, ZiGateResponseMatcherRule} from "./commandType";
 
 const debug = Debug('driver');
 
@@ -19,16 +19,22 @@ const autoDetectDefinitions = [
     {manufacturer: 'zz', vendorId: 'id', productId: '00'},
 ];
 const timeouts = {
-    default: 1000
+    reset: 30000,
+    default: 3000,
 };
 
-interface WaitressMatcher {
-    responseType?: number | boolean; // Тип status или обрабатываемый response
-    commandCode?: number;
-}
+type WaitressMatcher = {
+    ziGateObject: ZiGateObject,
+    rules: ZiGateResponseMatcher
+};
 
 function zeroPad(number: number, size?: number): string {
     return (number).toString(16).padStart(size || 4, '0');
+}
+
+function resolve(path: string | [], obj: { [k: string]: any }, separator = '.'): any {
+    const properties = Array.isArray(path) ? path : path.split(separator);
+    return properties.reduce((prev, curr) => prev && prev[curr], obj);
 }
 
 export default class ZiGate extends EventEmitter {
@@ -59,7 +65,7 @@ export default class ZiGate extends EventEmitter {
         this.rtscts = typeof serialPortOptions.rtscts === 'boolean' ? serialPortOptions.rtscts : false;
         this.portType = SocketPortUtils.isTcpPath(path) ? 'socket' : 'serial';
         this.initialized = false;
-        this.queue = new Queue();
+        this.queue = new Queue(1);
 
         this.waitress = new Waitress<ZiGateObject, WaitressMatcher>(
             this.waitressValidator, this.waitressTimeoutFormatter);
@@ -80,12 +86,16 @@ export default class ZiGate extends EventEmitter {
     }
 
     public close(): Promise<boolean> {
+        debug.error('close');
         return new Promise((resolve, reject) => {
             if (this.initialized) {
+
+                this.initialized = false;
+                this.portWrite = null;
                 if (this.portType === 'serial') {
                     this.serialPort.flush((): void => {
                         this.serialPort.close((error): void => {
-                            this.initialized = false;
+                            this.serialPort = null;
                             error == null ?
                                 resolve() :
                                 reject(new Error(`Error while closing serialPort '${error}'`));
@@ -93,8 +103,14 @@ export default class ZiGate extends EventEmitter {
                         });
                     });
                 } else {
-                    this.socketPort.destroy();
-                    resolve();
+                    // @ts-ignore
+                    this.socketPort.destroy((error?: Error): void => {
+                        this.socketPort = null;
+                        error == null ?
+                            resolve() :
+                            reject(new Error(`Error while closing serialPort '${error}'`));
+                        this.emit('close');
+                    });
                 }
             } else {
                 resolve();
@@ -108,7 +124,9 @@ export default class ZiGate extends EventEmitter {
         return this.queue.execute(async () => {
             try {
                 debug.log(
-                    'Send command \x1b[42m>>>> ' + ZiGateCommandCode[code] + ' 0x' + zeroPad(code)
+                    'Send command \x1b[42m>>>> '
+                    + ZiGateCommandCode[code]
+                    + ' 0x' + zeroPad(code)
                     + ' <<<<\x1b[0m ',
                 );
                 debug.log('payload: ', payload);
@@ -119,22 +137,39 @@ export default class ZiGate extends EventEmitter {
                 const sendBuffer = frame.toBuffer();
                 debug.log('Send command buff: ', sendBuffer);
 
-                let waiter;
-                if (ziGateObject.command.wait_response) {
-                    waiter = this.waitress.waitFor({
-                        responseType: ziGateObject.command.wait_response,
-                        commandCode: ziGateObject.code
-                    }, timeouts.default);
-                } else if (ziGateObject.command.wait_status) {
-                    waiter = this.waitress.waitFor(
-                        {responseType: 0x8000, commandCode: ziGateObject.code},
-                        timeouts.default
-                    );
-                }
+
+                const waiters: Promise<ZiGateObject>[] = [];
+                ziGateObject.command.response.forEach((rules) => {
+                    waiters.push(this.waitress.waitFor({ziGateObject, rules}, timeouts.default).start().promise);
+                });
+                // if (ziGateObject.command.response) {
+                //     waiter = this.waitress.waitFor({
+                //         responseType: ziGateObject.command.wait_response,
+                //         commandCode: ziGateObject.code
+                //     }, timeouts.default);
+                // } else if (ziGateObject.command.wait_status) {
+                //     waiter = this.waitress.waitFor(
+                //         {responseType: 0x8000, commandCode: ziGateObject.code},
+                //         timeouts.default
+                //     );
+                // }
 
                 this.portWrite.write(sendBuffer);
 
-                return waiter.start().promise;
+                return Promise.race(waiters);
+                // return new Promise(async (resolve, reject) => {
+                //     const firstResult = await Promise.race(waiters);
+                //
+                //     if (firstResult.code === 0x8000 && firstResult.payload.status !== 0) {
+                //         reject();
+                //     }
+                //     if (firstResult.code === 0x8000
+                //         && firstResult.payload.status === 0
+                //         &&
+                //     ) { // && count promiss >0
+                //         const dataResult = await Promise.race(waiters);
+                //     } //status
+                // });
             } catch (e) {
                 debug.error(e);
                 return new Promise((resolve, reject) => {
@@ -144,10 +179,9 @@ export default class ZiGate extends EventEmitter {
         });
     }
 
-    public waitFor(
-        responseType: number, command: number, timeout: number = timeouts.default
-    ): { start: () => { promise: Promise<ZiGateObject>; ID: number }; ID: number } {
-        return this.waitress.waitFor({responseType, commandCode: command}, timeout);
+    public waitFor(matcher: WaitressMatcher, timeout: number = timeouts.default):
+        { start: () => { promise: Promise<ZiGateObject>; ID: number }; ID: number } {
+        return this.waitress.waitFor(matcher, timeout);
     }
 
     private async openSerialPort(): Promise<void> {
@@ -224,7 +258,8 @@ export default class ZiGate extends EventEmitter {
 
             this.socketPort.on('error', (error) => {
                 debug.log('Socket error', error);
-                reject(new Error(`Error while opening socket`));
+                // reject(new Error(`Error while opening socket`));
+                reject();
                 self.initialized = false;
             });
 
@@ -237,7 +272,7 @@ export default class ZiGate extends EventEmitter {
     }
 
     private onPortClose(): void {
-        debug.log('serial ' + this.path + ' closed');
+        debug.log('serial closed');
         this.initialized = false;
         this.emit('close');
     }
@@ -272,8 +307,22 @@ export default class ZiGate extends EventEmitter {
                 if (code === ZiGateMessageCode.DataIndication) {
                     debug.info('raw');
 
-                    // @ts-ignore
-                    const zclFrame = ZclFrame.fromBuffer(ziGateObject.payload.clusterID, ziGateObject.payload.payload);
+                    let zclFrame = null;
+                    switch (ziGateObject.payload.clusterID) {
+                        case 0x8005:
+                            // @ts-ignore
+                            zclFrame = ZiGateObject.fromBufer(0x8005, ziGateObject.payload.payload);
+                            break;
+                        default:
+                            try {
+                                // @ts-ignore
+                                zclFrame = ZclFrame.fromBuffer(ziGateObject.payload.clusterID,
+                                    ziGateObject.payload.payload);
+                            } catch (e) {
+                                zclFrame = null;
+                            }
+                    }
+
                     this.emit('received', {ziGateObject, zclFrame});
                 } else if (code === ZiGateMessageCode.LeaveIndication) {
                     debug.log('raw leave');
@@ -295,27 +344,27 @@ export default class ZiGate extends EventEmitter {
     }
 
     private waitressTimeoutFormatter(matcher: WaitressMatcher, timeout: number): string {
-        return `${matcher.responseType} - ${matcher.commandCode} after ${timeout}ms`;
+        return `${matcher} after ${timeout}ms`;
     }
 
     private waitressValidator(ziGateObject: ZiGateObject, matcher: WaitressMatcher): boolean {
-        let requiredMatch: boolean;
 
+        const validator = (rule: ZiGateResponseMatcherRule): boolean => {
+            try {
+                let expectedValue: string | number;
+                if (typeof rule.value === "undefined" && typeof rule.expectedProperty !== "undefined") {
+                    expectedValue = resolve(rule.expectedProperty, matcher.ziGateObject);
+                } else {
+                    expectedValue = rule.value;
+                }
+                const receivedValue = resolve(rule.receivedProperty, ziGateObject);
 
-        // Если статус , пакет тип совпал , то ловим только если ожидает. или код не 0
-        if (ziGateObject.code === ZiGateMessageCode.Status) {
-            requiredMatch = matcher.commandCode === ziGateObject.payload.packetType
-                && (
-                    (ZiGateCommand[matcher.commandCode] !== undefined && ZiGateCommand[matcher.commandCode].wait_status === true)
-                    ||
-                    ziGateObject.payload.status !== 0
-                );
-        } else if (ziGateObject.code === ZiGateMessageCode.DataIndication) {
-            requiredMatch = matcher.commandCode === ziGateObject.payload.clusterID;
-        } else {
-            requiredMatch = ziGateObject.code === matcher.responseType;
-        }
-
-        return requiredMatch;
+                // debug.info(expectedValue, receivedValue, rule);
+                return rule.matcher(expectedValue, receivedValue);
+            } catch (e) {
+                return false;
+            }
+        };
+        return matcher.rules.every(validator);
     }
 }

@@ -136,4 +136,21 @@ export const ZiGateMessage: { [k: number]: ZiGateMessageType } = {
             {name: 'seqNumber', parameterType:'UINT8'}, // <seq number: uint8_t>
         ]
     },
+    [ZiGateMessageCode.ActiveEndpointResponse]: {
+        response: [
+            {name: 'sequence', parameterType:'UINT8'}, // <sequence: uint8_t>
+            {name: 'status', parameterType:'UINT8'}, // <status: uint8_t>
+            {name: 'nwkAddr', parameterType:'UINT16'},
+            {name: 'endpointCount', parameterType:'UINT8'},
+            {name: 'endpoints', parameterType: 'LIST_UINT8'},
+        ]
+    },
+    [ZiGateMessageCode.SimpleDescriptorResponse]: {
+        response: [
+            {name: 'sourceEndpoint', parameterType:'UINT8'}, //<source endpoint: uint8_t>
+            {name: 'profile ID', parameterType:'UINT8'}, // <profile ID: uint16_t>
+            {name: 'clusterID', parameterType:'UINT16'}, // <cluster ID: uint16_t>
+            {name: 'attributeList', parameterType:'LIST_UINT16BE'}, // <attribute list: data each entry is uint16_t>
+        ]
+    },
 };

@@ -65,7 +65,7 @@
   "license": "MIT",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "name": "zigbee-herdsman",
+  "name": "zigbee-herdsman-zigate-adapter",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Koenkk/zigbee-herdsman.git"
@@ -78,9 +78,10 @@
     "test-with-coverage": "jest test --coverage --collectCoverageFrom 'src/**/*.ts'",
     "test-watch": "jest test --watch",
     "eslint": "node_modules/.bin/eslint . --ext .ts",
+    "eslint-fix": "node_modules/.bin/eslint ./src/adapter/zigate/ --ext .ts",
     "docs": "typedoc --tsconfig typedoc-tsconfig.json"
   },
-  "version": "0.13.6",
+  "version": "0.13.6-dev-zigate-0.1",
   "jest": {
     "coverageThreshold": {
       "global": {

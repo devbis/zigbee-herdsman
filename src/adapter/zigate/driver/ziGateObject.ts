@@ -12,6 +12,14 @@ type ZiGateParameter = ZiGateCommandParameter | ZiGateMessageParameter;
 
 const debug = Debug('driver:ziGateObject');
 
+const BufferAndListTypes = [
+    'BUFFER', 'BUFFER8', 'BUFFER16',
+    'BUFFER18', 'BUFFER32', 'BUFFER42',
+    'BUFFER100', 'LIST_UINT16', 'LIST_ROUTING_TABLE',
+    'LIST_BIND_TABLE', 'LIST_NEIGHBOR_LQI', 'LIST_NETWORK',
+    'LIST_ASSOC_DEV', 'LIST_UINT8',
+];
+
 class ZiGateObject {
     private readonly _code: ZiGateCode;
     private readonly _payload: ZiGateObjectPayload;
@@ -80,6 +88,24 @@ class ZiGateObject {
 
         return new ZiGateObject(code, payload, parameters, frame);
     }
+    public static fromBufer(code: number, buffer: Buffer): ZiGateObject {
+        const msg = ZiGateMessage[code];
+
+        if (!msg) {
+            debug.error(`Message '${code.toString(16)}' not found`);
+            return;
+        }
+        const parameters = msg.response;
+
+        if (parameters === undefined) {
+            debug.error(`Message '${code.toString(16)}' cannot be a response`);
+            return;
+        }
+
+        const payload = this.readParameters(buffer, parameters);
+
+        return new ZiGateObject(code, payload, parameters);
+    }
 
     private static readParameters(buffer: Buffer, parameters: ZiGateParameter[]): ZiGateObjectPayload {
         const buffalo = new BuffaloZiGate(buffer);
@@ -88,15 +114,22 @@ class ZiGateObject {
         for (const parameter of parameters) {
             const options: BuffaloZiGateOptions = {};
 
-            // if (parameter.parameterType === 'ADDRESS_WITH_TYPE_DEPENDENCY') {
-            //     const typeParameter = parameters[parameters.indexOf(parameter) - 1];
-            //
-            //     parameter.parameterType =
-            //         result[typeParameter.parameterType] === 'short' ?
-            //             ParameterType.UINT8 : ParameterType.IEEEADDR; // @TODO
-            // }
+            if (BufferAndListTypes.includes(parameter.parameterType)) {
+                // When reading a buffer, assume that the previous parsed parameter contains
+                // the length of the buffer
+                const lengthParameter = parameters[parameters.indexOf(parameter) - 1];
+                const length = result[lengthParameter.name];
 
-            result[parameter.name] = buffalo.read(parameter.parameterType, options);
+                if (typeof length === 'number') {
+                    options.length = length;
+                }
+            }
+
+            try {
+                result[parameter.name] = buffalo.read(parameter.parameterType, options);
+            } catch (e) {
+                debug.error(e.stack);
+            }
         }
         return result;
     }

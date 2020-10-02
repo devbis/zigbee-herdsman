@@ -195,6 +195,8 @@ export enum ZiGateCommandCode {
     StartNetwork = 0x0024,
     StartNetworkScan = 0x0025,
     SetCertification = 0x0019,
+    Bind = 0x0030,
+    UnBind = 0x0031,
 
     // ResetFactoryNew = 0x0013,
     OnOff = 0x0092,
@@ -220,6 +222,9 @@ export enum ZiGateMessageCode {
     DeviceAnnounce = 0x004D,
     Status = 0x8000,
     DataIndication = 0x8002,
+    ActiveEndpointResponse = 0x8005,
+    SimpleDescriptorResponse = 0x8004,
+    // NodeDescriptorResponse = 0x8002,
     NetworkState = 0x8009,
     VersionList = 0x8010,
     APSDataConfirm = 0x8011,
@@ -230,6 +235,7 @@ export enum ZiGateMessageCode {
     PermitJoinStatus = 0x8014,
     GetTimeServer = 0x8017,
 }
+
 export interface ZiGateObjectPayload {
-    [key: string]: string | number | boolean
+    [key: string]: string | number | number[] | boolean | Buffer
 }

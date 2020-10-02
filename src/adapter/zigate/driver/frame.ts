@@ -37,12 +37,6 @@ const decodeBytes = (bytesPair: [number, number]): number => {
     return bytesPair[0] === 0x2 ? bytesPair[1] ^ 0x10 : bytesPair[0];
 };
 
-const encodeByte = (byte: number): number[] => {
-    console.log(byte);
-    console.log(byte >= 0x10 ? [byte] : [0x2, byte ^ 0x10]);
-    return byte >= 0x10 ? [byte] : [0x2, byte ^ 0x10]
-}
-
 const readBytes = (bytes: Buffer): number => {
     return bytes.readUIntBE(0, bytes.length);
 };
@@ -63,14 +57,6 @@ const decodeFrame = (frame: Buffer): Buffer => {
 
     return Buffer.from(arrFrame);
 };
-
-const encodeFrame = (frame: Buffer): Buffer => {
-    const arrFrame = Array
-        .from(frame)
-        .map(encodeByte)
-
-    return Buffer.from(arrFrame);
-}
 
 const getFrameChunk = (frame: Buffer, pos: number, size: ZiGateFrameChunkSize): Buffer => {
     return frame.slice(pos, pos + size);
@@ -120,18 +106,18 @@ export default class ZiGateFrame {
         this.msgPayloadBytes = getFrameChunk(frame, 6, this.readMsgLength());
         this.rssiBytes = getFrameChunk(frame, 6 + this.readMsgLength(), ZiGateFrameChunkSize.UInt8);
 
-        // try {
-        //     debug.log(
-        //         `msg code: %d\nmsg length: %d\nchecksum: %d\nmsg payload: %o\nrssi: %d`,
-        //         this.readMsgCode(),
-        //         this.readMsgLength(),
-        //         this.readChecksum(),
-        //         this.msgPayloadBytes,
-        //         this.readRSSI(),
-        //     );
-        // } catch (e) {
-        //     debug.error(e);
-        // }
+        try {
+            debug.log(
+                `msg code: %d\nmsg length: %d\nchecksum: %d\nmsg payload: %o\nrssi: %d`,
+                this.readMsgCode(),
+                this.readMsgLength(),
+                this.readChecksum(),
+                this.msgPayloadBytes,
+                this.readRSSI(),
+            );
+        } catch (e) {
+            debug.error(e);
+        }
 
     }
 
@@ -146,7 +132,7 @@ export default class ZiGateFrame {
                 this.msgPayloadBytes,
             ],
             length,
-        ))
+        ));
 
         return Buffer.concat(
             [
@@ -158,8 +144,8 @@ export default class ZiGateFrame {
     }
 
     escapeData(data: Buffer): Buffer {
-        var encodedLength = 0;
-        var encodedData = Buffer.alloc(data.length * 2);
+        let encodedLength = 0;
+        const encodedData = Buffer.alloc(data.length * 2);
         const FRAME_ESCAPE_XOR = 0x10;
         const FRAME_ESCAPE = 0x02;
         for (const b of data) {

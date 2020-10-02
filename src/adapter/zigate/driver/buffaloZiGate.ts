@@ -1,9 +1,6 @@
 import {Buffalo, TsType as BuffaloTsType, TsType} from '../../../buffalo';
 import {Options, Value} from "../../../buffalo/tstype";
-import {Debug} from "../debug";
 import {IsNumberArray} from "../../../utils";
-
-const debug = Debug('driver:bufaloZiGate');
 
 export interface BuffaloZiGateOptions extends BuffaloTsType.Options {
     startIndex?: number;
@@ -11,17 +8,18 @@ export interface BuffaloZiGateOptions extends BuffaloTsType.Options {
 
 class BuffaloZiGate extends Buffalo {
     public write(type: string, value: Value, options: Options): void {
-
-        if (type === 'MACCAPABILITY') {
-
-        } else if (type === 'RAW') {
+        if (type === 'RAW') {
             this.buffer.set(value, this.position);
             this.position++;
         } else if (type === 'UINT16BE') {
             this.buffer.writeUInt16BE(value, this.position);
             this.position += 2;
+        } else if (type === 'UINT32BE') {
+            this.buffer.writeUInt32BE(value, this.position);
+            this.position += 4;
         } else if (type === 'ADDRESS_WITH_TYPE_DEPENDENCY') {
-
+            const addressMode = this.buffer.readUInt8(this.position - 1);
+            return addressMode == 3 ? this.writeIeeeAddr(value) : this.writeUInt16BE(value);
         } else if (type === 'BUFFER' && (Buffer.isBuffer(value) || IsNumberArray(value))) {
             this.writeBuffer(value, value.length);
         } else {
@@ -30,6 +28,7 @@ class BuffaloZiGate extends Buffalo {
     }
 
     public read(type: string, options: BuffaloZiGateOptions): TsType.Value {
+
         if (type === 'MACCAPABILITY') {
             const result: { [k: string]: boolean | number } = {};
             const mac = this.readUInt8();
@@ -52,6 +51,8 @@ class BuffaloZiGate extends Buffalo {
             return result;
         } else if (type === 'UINT16BE') {
             return this.readUInt16BE();
+        } else if (type === 'UINT32BE') {
+            return this.readUInt32BE();
         } else if (type === 'ADDRESS_WITH_TYPE_DEPENDENCY') {
             // 		rep.addressSourceMode = Enum.ADDRESS_MODE(reader.nextUInt8());
             // 		rep.addressSource = rep.addressSourceMode.name === 'short' ?
@@ -69,16 +70,26 @@ class BuffaloZiGate extends Buffalo {
     }
 
 
-    public writeUInt16BE(): Value {
-        const value = this.buffer.writeUInt16BE(this.position);
-        this.position += 2;
-        return value;
-    }
-
     public readUInt16BE(): Value {
         const value = this.buffer.readUInt16BE(this.position);
         this.position += 2;
         return value;
+    }
+
+    public readUInt32BE(): Value {
+        const value = this.buffer.readUInt32BE(this.position);
+        this.position += 4;
+        return value;
+    }
+
+    public writeUInt16BE(value: number): void {
+        this.buffer.writeUInt16BE(value, this.position);
+        this.position += 2;
+    }
+
+    public writeUInt32BE(value: number): void {
+        this.buffer.writeUInt32BE(value, this.position);
+        this.position += 4;
     }
 
 }
