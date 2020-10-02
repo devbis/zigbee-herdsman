@@ -106,7 +106,7 @@ export const ZiGateCommand: { [key: string]: ZiGateCommandType } = {
         wait_status: true,
         wait_response: false
     },
-    [ZiGateCommandCode.SetExpendedPANID]: {
+    [ZiGateCommandCode.SetExtendedPANID]: {
         request: [
             {name: 'panId', parameterType: 'IEEEADDR'}, //<64-bit Extended PAN ID:uint64_t>
         ],

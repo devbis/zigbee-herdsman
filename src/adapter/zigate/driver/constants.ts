@@ -179,7 +179,7 @@ export enum RESTART_STATUS {
 export enum ZiGateCommandCode {
     GetNetworkState = 0x0009,
     RawMode = 0x0002,
-    SetExpendedPANID = 0x0020,
+    SetExtendedPANID = 0x0020,
     SetChannelMask = 0x0021,
     GetVersion = 0x0010,
     Reset = 0x0011,

@@ -117,6 +117,12 @@ class ZiGateAdapter extends Adapter {
 
         await this.driver.sendCommand(ZiGateCommandCode.StartNetwork, {});
         await this.driver.sendCommand(ZiGateCommandCode.StartNetworkScan, {});
+
+        // set EPID from config
+        await this.driver.sendCommand(ZiGateCommandCode.SetExtendedPANID, {
+            panId: Buffer.from(this.networkOptions.extendedPanID).toString(),
+        });
+
     }
 
 
