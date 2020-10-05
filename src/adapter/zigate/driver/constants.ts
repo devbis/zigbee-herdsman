@@ -234,6 +234,7 @@ export enum ZiGateMessageCode {
     APSDataConfirmFail = 0x8702,
     PermitJoinStatus = 0x8014,
     GetTimeServer = 0x8017,
+    ManagementLQIResponse = 0x804E,
 }
 
 export interface ZiGateObjectPayload {

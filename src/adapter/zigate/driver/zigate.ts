@@ -20,7 +20,7 @@ const autoDetectDefinitions = [
 ];
 const timeouts = {
     reset: 30000,
-    default: 3000,
+    default: 10000,
 };
 
 type WaitressMatcher = {
@@ -53,7 +53,7 @@ export default class ZiGate extends EventEmitter {
     private queue: Queue;
 
     // private waitress: Waitress<ZpiObject, WaitressMatcher>;
-    public portWrite: any;
+    public portWrite: SerialPort | net.Socket;
     private waitress: Waitress<ZiGateObject, WaitressMatcher>;
 
     public constructor(path: string, serialPortOptions: SerialPortOptions) {
@@ -70,6 +70,49 @@ export default class ZiGate extends EventEmitter {
         this.waitress = new Waitress<ZiGateObject, WaitressMatcher>(
             this.waitressValidator, this.waitressTimeoutFormatter);
 
+    }
+
+    public async sendCommand(
+        code: ZiGateCommandCode,
+        payload?: ZiGateObjectPayload,
+        timeout?: number
+    ): Promise<ZiGateObject> { // @TODO ?
+        // const argument = arguments;
+        return this.queue.execute(async () => {
+            try {
+                debug.log(
+                    'Send command \x1b[42m>>>> '
+                    + ZiGateCommandCode[code]
+                    + ' 0x' + zeroPad(code)
+                    + ' <<<<\x1b[0m ',
+                );
+                debug.log('payload: ', payload);
+
+                const ziGateObject = ZiGateObject.createRequest(code, payload);
+                const frame = ziGateObject.toZiGateFrame();
+
+                const sendBuffer = frame.toBuffer();
+                debug.log('Send command buff: ', sendBuffer);
+
+
+                const waiters: Promise<ZiGateObject>[] = [];
+                ziGateObject.command.response.forEach((rules) => {
+                    waiters.push(
+                        this.waitress.waitFor({ziGateObject, rules}, timeout || timeouts.default
+                        ).start().promise);
+                });
+
+                // @ts-ignore
+                this.portWrite.write(sendBuffer);
+
+                return Promise.race(waiters);
+            } catch (e) {
+                debug.error(e);
+                return new Promise((resolve, reject) => {
+                    reject();
+                });
+            }
+        });
     }
 
     public static async isValidPath(path: string): Promise<boolean> {
@@ -115,66 +158,6 @@ export default class ZiGate extends EventEmitter {
             } else {
                 resolve();
                 this.emit('close');
-            }
-        });
-    }
-
-    public async sendCommand(code: ZiGateCommandCode, payload?: ZiGateObjectPayload): Promise<void | ZiGateObject> { // @TODO ?
-        // const argument = arguments;
-        return this.queue.execute(async () => {
-            try {
-                debug.log(
-                    'Send command \x1b[42m>>>> '
-                    + ZiGateCommandCode[code]
-                    + ' 0x' + zeroPad(code)
-                    + ' <<<<\x1b[0m ',
-                );
-                debug.log('payload: ', payload);
-
-                const ziGateObject = ZiGateObject.createRequest(code, payload);
-                const frame = ziGateObject.toZiGateFrame();
-
-                const sendBuffer = frame.toBuffer();
-                debug.log('Send command buff: ', sendBuffer);
-
-
-                const waiters: Promise<ZiGateObject>[] = [];
-                ziGateObject.command.response.forEach((rules) => {
-                    waiters.push(this.waitress.waitFor({ziGateObject, rules}, timeouts.default).start().promise);
-                });
-                // if (ziGateObject.command.response) {
-                //     waiter = this.waitress.waitFor({
-                //         responseType: ziGateObject.command.wait_response,
-                //         commandCode: ziGateObject.code
-                //     }, timeouts.default);
-                // } else if (ziGateObject.command.wait_status) {
-                //     waiter = this.waitress.waitFor(
-                //         {responseType: 0x8000, commandCode: ziGateObject.code},
-                //         timeouts.default
-                //     );
-                // }
-
-                this.portWrite.write(sendBuffer);
-
-                return Promise.race(waiters);
-                // return new Promise(async (resolve, reject) => {
-                //     const firstResult = await Promise.race(waiters);
-                //
-                //     if (firstResult.code === 0x8000 && firstResult.payload.status !== 0) {
-                //         reject();
-                //     }
-                //     if (firstResult.code === 0x8000
-                //         && firstResult.payload.status === 0
-                //         &&
-                //     ) { // && count promiss >0
-                //         const dataResult = await Promise.race(waiters);
-                //     } //status
-                // });
-            } catch (e) {
-                debug.error(e);
-                return new Promise((resolve, reject) => {
-                    reject();
-                });
             }
         });
     }

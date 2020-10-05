@@ -119,20 +119,11 @@ class ZiGateAdapter extends Adapter {
         debug.log('start', arguments)
         // открываем адаптер, пробуем пингануть
         await this.driver.open()
-            .then(() => {
+            .then(async () => {
                 debug.log("well connected to zigate key.", arguments);
 
-                return this.driver.sendCommand(ZiGateCommandCode.Reset, {});
+                // return this.driver.sendCommand(ZiGateCommandCode.Reset, {}, 30000);
 
-            })
-            .then(async () => {
-
-                //
-                await this.driver.sendCommand(ZiGateCommandCode.PermitJoin, {
-                    targetShortAddress: 0,
-                    interval: 254,
-                    TCsignificance: 0
-                });
                 await this.driver.sendCommand(ZiGateCommandCode.RawMode, {enabled: 0x01}); // Включаем raw mode
                 // await this.driver.sendCommand(ZiGateCommandCode.RawMode, {enabled: 0x02}); //  raw hybrid mode
                 this.driver.sendCommand(ZiGateCommandCode.SetDeviceType, {deviceType: 0});
@@ -147,7 +138,6 @@ class ZiGateAdapter extends Adapter {
                 await this.driver.sendCommand(ZiGateCommandCode.StartNetwork, {});
                 // await this.driver.sendCommand(ZiGateCommandCode.StartNetworkScan, {});
 
-                await this.driver.sendCommand(ZiGateCommandCode.GetNetworkState, {});
 
             })
             .catch((error: string) => {
@@ -156,11 +146,10 @@ class ZiGateAdapter extends Adapter {
             });
 
         // Выставляем настройки конкуренции в очереди
-        const concurrent = this.adapterOptions && this.adapterOptions.concurrent ?
-            this.adapterOptions.concurrent : (1);
-        debug.log(`Adapter concurrent: ${concurrent}`);
-        this.queue = new Queue(concurrent);
-        debug.log(`Detected zigate version '${this.fwVersion}' (${JSON.stringify(this.fwVersion)})`);
+        // const concurrent = this.adapterOptions && this.adapterOptions.concurrent ?
+        //     this.adapterOptions.concurrent : (1);
+        // debug.log(`Adapter concurrent: ${concurrent}`);
+        // this.queue = new Queue(concurrent);
 
 
         return 'restored'; // 'resumed' | 'reset' | 'restored'
@@ -277,23 +266,21 @@ class ZiGateAdapter extends Adapter {
         debug.log('reset', type, arguments)
 
         if (type === 'soft') {
-            await this.driver.sendCommand(ZiGateCommandCode.Reset, {});
+            await this.driver.sendCommand(ZiGateCommandCode.Reset, {}, 30000);
             return;
         } else if (type === 'hard') {
-            await this.driver.sendCommand(ZiGateCommandCode.ErasePersistentData, {});
-            await this.driver.sendCommand(ZiGateCommandCode.Reset, {});
+            await this.driver.sendCommand(ZiGateCommandCode.ErasePersistentData, {}, 30000);
+            await this.driver.sendCommand(ZiGateCommandCode.Reset, {}, 30000);
             return;
         }
     };
 
     public supportsLED(): Promise<boolean> {
-        debug.log('supportsLED', arguments)
         return Promise.reject();
     };
 
     public setLED(enabled: boolean): Promise<void> {
-        debug.log('setLED', arguments)
-        return
+        return Promise.reject();
     };
 
     /**
@@ -308,15 +295,26 @@ class ZiGateAdapter extends Adapter {
         return Promise.reject();
     };
 
-    public getNetworkParameters(): Promise<TsType.NetworkParameters> {
+    public async getNetworkParameters(): Promise<TsType.NetworkParameters> {
         debug.log('getNetworkParameters', arguments)
-        return
+
+        const NetworkStateResponse = await this.driver.sendCommand(ZiGateCommandCode.GetNetworkState, {}, 10000);
+
+        debug.error(NetworkStateResponse);
+        const resultPayload: TsType.NetworkParameters = {
+            // @ts-ignore
+            panID: NetworkStateResponse.payload.PANID,
+            // @ts-ignore
+            extendedPanID: NetworkStateResponse.payload.ExtPANID,
+            // @ts-ignore
+            channel: NetworkStateResponse.payload.Channel
+        }
+        return Promise.resolve(resultPayload);
     };
 
-    public setTransmitPower(value: number): Promise<void> {
+    public async setTransmitPower(value: number): Promise<void> {
         debug.log('setTransmitPower', arguments)
-        // this.driver.sendCommand(0x0806, {value: value});
-        return
+        this.driver.sendCommand(ZiGateCommandCode.SetTXpower, {value: value});
     };
 
     /**
@@ -330,23 +328,22 @@ class ZiGateAdapter extends Adapter {
             TCsignificance: 0
         });
 
-        if (seconds === 0) {
-            this.joinPermitted = false;
-        } else {
-            this.joinPermitted = true;
-        }
-        await this.driver.sendCommand(ZiGateCommandCode.PermitJoinStatus, {});
-
+        const result = await this.driver.sendCommand(ZiGateCommandCode.PermitJoinStatus, {});
+        this.joinPermitted = result.payload.status === 1;
     };
 
-    public lqi(networkAddress: number): Promise<TsType.LQI> {
+    public async lqi(networkAddress: number): Promise<TsType.LQI> {
         debug.log('lqi', arguments)
-        this.driver.sendCommand(0x004E, {targetAddress: networkAddress, startIndex: 0});
+
+        const resultPayload = await this.driver.sendCommand(ZiGateCommandCode.ManagementLQI,
+            {targetAddress: networkAddress, startIndex: 0}
+        );
         return
     };
 
     public routingTable(networkAddress: number): Promise<TsType.RoutingTable> {
         debug.log('RoutingTable', arguments)
+        // @TODO
         return
     };
 
@@ -371,7 +368,7 @@ class ZiGateAdapter extends Adapter {
 
 
             // @ts-ignore
-            const data = result.payload.payload;
+            const data: Buffer = result.payload.payload;
             const buf = data;
             const logicaltype = (data[4] & 7);
             const type: DeviceType = (logicaltype === 1) ? 'Router' : (logicaltype === 2) ? 'EndDevice' : (logicaltype === 0) ? 'Coordinator' : 'Unknown';
@@ -437,7 +434,7 @@ class ZiGateAdapter extends Adapter {
                 throw new Error('activeEndpoints error ' + result.payload.status)
 
             // @ts-ignore
-            const buf = result.payload.payload;
+            const buf: Buffer = result.payload.payload;
 
             if (buf.length > 11) {
 
@@ -606,6 +603,12 @@ class ZiGateAdapter extends Adapter {
 
     public sendZclFrameInterPANToIeeeAddr(zclFrame: ZclFrame, ieeeAddress: string): Promise<void> {
         debug.log('sendZclFrameInterPANToIeeeAddr', arguments)
+        // return this.queue.execute<void>(async () => {
+        //     await this.dataRequestExtended(
+        //         AddressMode.ADDR_64BIT, ieeeAddr, 0xFE, 0xFFFF,
+        //         12, zclFrame.Cluster.ID, 30, zclFrame.toBuffer(), 10000, false,
+        //     );
+        // });
         return
     };
 
@@ -618,7 +621,7 @@ class ZiGateAdapter extends Adapter {
 
     public restoreChannelInterPAN(): Promise<void> {
         debug.log('restoreChannelInterPAN', arguments)
-        return
+        return Promise.reject();
     };
 
 

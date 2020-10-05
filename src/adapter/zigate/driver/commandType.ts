@@ -98,7 +98,11 @@ export const ZiGateCommand: { [key: string]: ZiGateCommandType } = {
             [
                 {receivedProperty: 'code', matcher: equal, value: ZiGateMessageCode.Status},
                 {receivedProperty: 'payload.packetType', matcher: equal, value: ZiGateCommandCode.GetNetworkState},
-            ]
+            ],
+
+            [
+                {receivedProperty: 'code', matcher: equal, value: ZiGateMessageCode.NetworkState},
+            ],
         ]
     },
     [ZiGateCommandCode.GetTimeServer]: { // 0x0017
@@ -141,7 +145,7 @@ export const ZiGateCommand: { [key: string]: ZiGateCommandType } = {
     },
     [ZiGateCommandCode.ManagementLQI]: { // 0x004E
         request: [
-            {name: 'targetAddress', parameterType: 'UINT16'}, //<Target Address : uint16_t>	Status
+            {name: 'targetAddress', parameterType: 'UINT16BE'}, //<Target Address : uint16_t>	Status
             {name: 'startIndex', parameterType: 'UINT8'}, //<Start Index : uint8_t>
 
         ],
@@ -149,7 +153,10 @@ export const ZiGateCommand: { [key: string]: ZiGateCommandType } = {
             [
                 {receivedProperty: 'code', matcher: equal, value: ZiGateMessageCode.Status},
                 {receivedProperty: 'payload.packetType', matcher: equal, value: ZiGateCommandCode.ManagementLQI},
-            ]
+            ],
+            [
+                {receivedProperty: 'code', matcher: equal, value: ZiGateMessageCode.ManagementLQIResponse},
+            ],
         ]
     },
     [ZiGateCommandCode.SetSecurityStateKey]: { // 0x0022
@@ -213,7 +220,7 @@ export const ZiGateCommand: { [key: string]: ZiGateCommandType } = {
     },
     [ZiGateCommandCode.RemoveDevice]: {
         request: [
-            {name: 'targetShortAddress', parameterType: 'IEEEADDR'}, // <target short address: uint64_t>
+            {name: 'targetShortAddress', parameterType: 'UINT16BE'}, // <target short address: uint64_t>
             {name: 'extendedAddress:', parameterType: 'IEEEADDR'}, // <extended address: uint64_t>
         ],
         response: [
@@ -229,7 +236,7 @@ export const ZiGateCommand: { [key: string]: ZiGateCommandType } = {
     },
     [ZiGateCommandCode.PermitJoin]: {
         request: [
-            {name: 'targetShortAddress', parameterType: 'UINT16'}, //<target short address: uint16_t> -
+            {name: 'targetShortAddress', parameterType: 'UINT16BE'}, //<target short address: uint16_t> -
             // broadcast 0xfffc
             {name: 'interval', parameterType: 'UINT8'}, //<interval: uint8_t>
             // 0 = Disable Joining
@@ -248,7 +255,7 @@ export const ZiGateCommand: { [key: string]: ZiGateCommandType } = {
     },
     [ZiGateCommandCode.PermitJoinStatus]: {
         request: [
-            {name: 'targetShortAddress', parameterType: 'UINT16'}, //<target short address: uint16_t> -
+            {name: 'targetShortAddress', parameterType: 'UINT16BE'}, //<target short address: uint16_t> -
             // broadcast 0xfffc
             {name: 'interval', parameterType: 'UINT8'}, //<interval: uint8_t>
             // 0 = Disable Joining

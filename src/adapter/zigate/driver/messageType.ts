@@ -153,4 +153,37 @@ export const ZiGateMessage: { [k: number]: ZiGateMessageType } = {
             {name: 'attributeList', parameterType:'LIST_UINT16BE'}, // <attribute list: data each entry is uint16_t>
         ]
     },
+    [ZiGateMessageCode.ManagementLQIResponse]: {
+
+
+
+
+
+
+        response: [
+            {name: 'sequence', parameterType:'UINT8'}, // <Sequence number: uint8_t>
+            {name: 'status', parameterType:'UINT8'}, // <status: uint8_t>
+            {name: 'neighbourTableEntries', parameterType:'UINT8'}, // <Neighbour Table Entries : uint8_t>
+            {name: 'neighbourTableListCount', parameterType:'UINT8'}, // <Neighbour Table List Count : uint8_t>
+            {name: 'startIndex', parameterType:'UINT8'}, // <Start Index : uint8_t>
+            // @TODO list TYPE
+            // <List of Entries elements described below :>
+            // Note: If Neighbour Table list count is 0, there are no elements in the list.
+            {name: 'NWKAddress', parameterType:'UINT16BE'}, // NWK Address : uint16_t
+            {name: 'Extended PAN ID', parameterType:'UINT64'}, // Extended PAN ID : uint64_t
+            {name: 'IEEE Address', parameterType:'IEEEADR'}, // IEEE Address : uint64_t
+            {name: 'Depth', parameterType:'UINT8'}, // Depth : uint_t
+            {name: 'linkQuality', parameterType:'UINT8'}, // Link Quality : uint8_t
+            {name: 'bitMap', parameterType:'UINT8'}, // Bit map of attributes Described below: uint8_t
+            // bit 0-1 Device Type
+            // (0-Coordinator 1-Router 2-End Device)
+            // bit 2-3 Permit Join status
+            // (1- On 0-Off)
+            // bit 4-5 Relationship
+            // (0-Parent 1-Child 2-Sibling)
+            // bit 6-7 Rx On When Idle status
+            // (1-On 0-Off)
+            {name: 'srcAddress', parameterType:'UINT16'}, // <Src Address : uint16_t> ( only from v3.1a)
+        ]
+    },
 };

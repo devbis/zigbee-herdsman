@@ -12,11 +12,9 @@ class BuffaloZiGate extends Buffalo {
             this.buffer.set(value, this.position);
             this.position++;
         } else if (type === 'UINT16BE') {
-            this.buffer.writeUInt16BE(value, this.position);
-            this.position += 2;
+            this.writeUInt16BE(value);
         } else if (type === 'UINT32BE') {
-            this.buffer.writeUInt32BE(value, this.position);
-            this.position += 4;
+            this.writeUInt32BE(value);
         } else if (type === 'ADDRESS_WITH_TYPE_DEPENDENCY') {
             const addressMode = this.buffer.readUInt8(this.position - 1);
             return addressMode == 3 ? this.writeIeeeAddr(value) : this.writeUInt16BE(value);

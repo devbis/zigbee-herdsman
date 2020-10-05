@@ -81,7 +81,7 @@
     "eslint-fix": "node_modules/.bin/eslint ./src/adapter/zigate/ --ext .ts",
     "docs": "typedoc --tsconfig typedoc-tsconfig.json"
   },
-  "version": "0.13.6-dev-zigate-0.1",
+  "version": "0.13.6-dev-zigate-0.2",
   "jest": {
     "coverageThreshold": {
       "global": {
