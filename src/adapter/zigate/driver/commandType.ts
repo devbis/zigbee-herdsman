@@ -203,7 +203,7 @@ export const ZiGateCommand: { [key: string]: ZiGateCommandType } = {
         response: [
             [
                 {receivedProperty: 'code', matcher: equal, value: ZiGateMessageCode.Status},
-                {receivedProperty: 'payload.packetType', matcher: equal, value: ZiGateCommandCode.SetExpendedPANID},
+                {receivedProperty: 'payload.packetType', matcher: equal, value: ZiGateCommandCode.SetExtendedPANID},
             ]
         ]
     },
