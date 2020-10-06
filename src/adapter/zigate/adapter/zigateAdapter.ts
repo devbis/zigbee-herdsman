@@ -481,7 +481,7 @@ class ZiGateAdapter extends Adapter {
             targetExtendedAddress: sourceIeeeAddress,
             targetEndpoint: sourceEndpoint,
             clusterID: clusterID,
-            destinationAddressMode: (type === 'group') ? 0x01 : 0x03,
+            destinationAddressMode: (type === 'group') ? 0x01 : 0x02,
             destinationAddress: destinationNetworkAddress,
         };
 

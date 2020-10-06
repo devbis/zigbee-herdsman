@@ -383,7 +383,7 @@ export const ZiGateCommand: { [key: string]: ZiGateCommandType } = {
     },
     [ZiGateCommandCode.Bind]: {
         request: [
-            {name: 'targetExtendedAddress', parameterType: 'IEEEADR'}, // <target extended address: uint64_t>
+            {name: 'targetExtendedAddress', parameterType: 'IEEEADDR'}, // <target extended address: uint64_t>
             {name: 'targetEndpoint', parameterType: 'UINT8'}, // <target endpoint: uint8_t>
             {name: 'clusterID', parameterType: 'UINT16BE'}, // <cluster ID: uint16_t>
             {name: 'destinationAddressMode', parameterType: 'UINT8'}, // <destination address mode: uint8_t>
