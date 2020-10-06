@@ -179,7 +179,7 @@ export enum RESTART_STATUS {
 export enum ZiGateCommandCode {
     GetNetworkState = 0x0009,
     RawMode = 0x0002,
-    SetExpendedPANID = 0x0020,
+    SetExtendedPANID = 0x0020,
     SetChannelMask = 0x0021,
     GetVersion = 0x0010,
     Reset = 0x0011,
@@ -239,4 +239,16 @@ export enum ZiGateMessageCode {
 
 export interface ZiGateObjectPayload {
     [key: string]: string | number | number[] | boolean | Buffer
+}
+
+export enum ZPSNwkKeyState {
+    ZPS_ZDO_NO_NETWORK_KEY,
+    ZPS_ZDO_PRECONFIGURED_LINK_KEY,
+    ZPS_ZDO_DISTRIBUTED_LINK_KEY,
+    ZPS_ZDO_PRECONFIGURED_INSTALLATION_CODE,
+}
+
+export enum ZPSNwkKeyType {
+    ZPS_APS_UNIQUE_LINK_KEY,                 /*Initial key*/
+    ZPS_APS_GLOBAL_LINK_KEY,
 }

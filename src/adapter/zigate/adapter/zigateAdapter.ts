@@ -8,7 +8,7 @@ import {Direction, FrameType, ZclFrame} from '../../../zcl';
 import {Queue, Waitress} from '../../../utils';
 import Driver from '../driver/zigate';
 import {Debug} from "../debug";
-import {ZiGateCommandCode} from "../driver/constants";
+import {ZiGateCommandCode, ZPSNwkKeyState} from "../driver/constants";
 import {RawAPSDataRequestPayload} from "../driver/commandType";
 import ZiGateObject from "../driver/ziGateObject";
 
@@ -111,6 +111,41 @@ class ZiGateAdapter extends Adapter {
         });
 
     }
+    /**
+     * Supplementary functions
+     */
+
+
+    private async initNetwork(): Promise<void> {
+
+        debug.log(`Set channel mask ${this.networkOptions.channelList} key`);
+        await this.driver.sendCommand(
+            ZiGateCommandCode.SetChannelMask,
+            {channelMask: channelsToMask(this.networkOptions.channelList)},
+        );
+        debug.log(`Set security key`);
+
+        await this.driver.sendCommand(
+            ZiGateCommandCode.SetSecurityStateKey,
+            {
+                keyType: this.networkOptions.networkKeyDistribute ?
+                    ZPSNwkKeyState.ZPS_ZDO_DISTRIBUTED_LINK_KEY:
+                    ZPSNwkKeyState.ZPS_ZDO_PRECONFIGURED_LINK_KEY,
+                key: this.networkOptions.networkKey,
+            },
+        );
+
+        await this.driver.sendCommand(ZiGateCommandCode.StartNetwork, {});
+        await this.driver.sendCommand(ZiGateCommandCode.StartNetworkScan, {});
+
+        // set EPID from config
+        debug.log(`Set EPanID ${this.networkOptions.extendedPanID}`);
+        await this.driver.sendCommand(ZiGateCommandCode.SetExtendedPANID, {
+            panId: this.networkOptions.extendedPanID,
+        });
+
+    }
+
 
     /**
      * Adapter methods
@@ -118,32 +153,20 @@ class ZiGateAdapter extends Adapter {
     public async start(): Promise<TsType.StartResult> {
         debug.log('start', arguments)
         // открываем адаптер, пробуем пингануть
-        await this.driver.open()
-            .then(async () => {
-                debug.log("well connected to zigate key.", arguments);
+        await this.driver.open();
+        try {
+            debug.log("well connected to zigate key.", arguments);
+            // await this.driver.sendCommand(ZiGateCommandCode.SetDeviceType, {deviceType: 0});
 
-                // return this.driver.sendCommand(ZiGateCommandCode.Reset, {}, 30000);
+            await this.driver.sendCommand(ZiGateCommandCode.RawMode, {enabled: 0x01}); // Включаем raw mode
+            // await this.driver.sendCommand(ZiGateCommandCode.RawMode, {enabled: 0x02}); //  raw hybrid mode
 
-                await this.driver.sendCommand(ZiGateCommandCode.RawMode, {enabled: 0x01}); // Включаем raw mode
-                // await this.driver.sendCommand(ZiGateCommandCode.RawMode, {enabled: 0x02}); //  raw hybrid mode
-                this.driver.sendCommand(ZiGateCommandCode.SetDeviceType, {deviceType: 0});
+            await this.initNetwork();
+        } catch(error) {
+            debug.error("dont connected to zigate key");
+            debug.error(error);
+        }
 
-
-                // @ts-ignore
-                await this.driver.sendCommand(
-                    ZiGateCommandCode.SetChannelMask,
-                    {channelMask: channelsToMask(this.networkOptions.channelList)},
-                );
-
-                await this.driver.sendCommand(ZiGateCommandCode.StartNetwork, {});
-                // await this.driver.sendCommand(ZiGateCommandCode.StartNetworkScan, {});
-
-
-            })
-            .catch((error: string) => {
-                debug.error("dont connected to zigate key");
-                debug.error(error);
-            });
 
         // Выставляем настройки конкуренции в очереди
         // const concurrent = this.adapterOptions && this.adapterOptions.concurrent ?
@@ -542,7 +565,7 @@ class ZiGateAdapter extends Adapter {
             if (result.code === 0x8000 && result.payload.status > 0)
                 // @ts-ignore
                 throw new Error('sendZclFrameToEndpoint error ' + result.payload.status)
-            
+
             // @ts-ignore
             const frame: ZclFrame = ZclFrame.fromBuffer(zclFrame.Cluster.ID, result.payload.payload);
 
@@ -673,6 +696,5 @@ class ZiGateAdapter extends Adapter {
 
     }
 }
-
 
 export default ZiGateAdapter;
