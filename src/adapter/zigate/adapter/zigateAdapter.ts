@@ -542,13 +542,15 @@ class ZiGateAdapter extends Adapter {
             if (result.code === 0x8000 && result.payload.status > 0)
                 // @ts-ignore
                 throw new Error('sendZclFrameToEndpoint error ' + result.payload.status)
-
+            
+            // @ts-ignore
+            const frame: ZclFrame = ZclFrame.fromBuffer(zclFrame.Cluster.ID, result.payload.payload);
 
             const resultPayload: Events.ZclDataPayload = {
                 // @ts-ignore
                 address: result.payload.sourceAddress,
                 // @ts-ignore
-                frame: result.payload.payload,
+                frame: frame,
                 // @ts-ignore
                 endpoint: result.payload.sourceEndpoint,
                 // @ts-ignore
