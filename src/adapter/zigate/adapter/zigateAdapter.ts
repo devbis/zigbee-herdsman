@@ -136,7 +136,7 @@ class ZiGateAdapter extends Adapter {
         );
 
         await this.driver.sendCommand(ZiGateCommandCode.StartNetwork, {});
-        await this.driver.sendCommand(ZiGateCommandCode.StartNetworkScan, {});
+        // await this.driver.sendCommand(ZiGateCommandCode.StartNetworkScan, {});
 
         // set EPID from config
         debug.log(`Set EPanID ${this.networkOptions.extendedPanID}`);
@@ -158,8 +158,8 @@ class ZiGateAdapter extends Adapter {
             debug.log("well connected to zigate key.", arguments);
             // await this.driver.sendCommand(ZiGateCommandCode.SetDeviceType, {deviceType: 0});
 
-            await this.driver.sendCommand(ZiGateCommandCode.RawMode, {enabled: 0x01}); // Включаем raw mode
-            // await this.driver.sendCommand(ZiGateCommandCode.RawMode, {enabled: 0x02}); //  raw hybrid mode
+            // await this.driver.sendCommand(ZiGateCommandCode.RawMode, {enabled: 0x01}); // Включаем raw mode
+            await this.driver.sendCommand(ZiGateCommandCode.RawMode, {enabled: 0x02}); //  raw hybrid mode
 
             await this.initNetwork();
         } catch(error) {
