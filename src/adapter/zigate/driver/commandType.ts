@@ -97,6 +97,7 @@ export const ZiGateCommand: { [key: string]: ZiGateCommandType } = {
         response: [
             [
                 {receivedProperty: 'code', matcher: equal, value: ZiGateMessageCode.Status},
+                {receivedProperty: 'payload.status', matcher: notEqual, value: 0},
                 {receivedProperty: 'payload.packetType', matcher: equal, value: ZiGateCommandCode.GetNetworkState},
             ],
 
@@ -387,7 +388,10 @@ export const ZiGateCommand: { [key: string]: ZiGateCommandType } = {
             {name: 'targetEndpoint', parameterType: 'UINT8'}, // <target endpoint: uint8_t>
             {name: 'clusterID', parameterType: 'UINT16BE'}, // <cluster ID: uint16_t>
             {name: 'destinationAddressMode', parameterType: 'UINT8'}, // <destination address mode: uint8_t>
-            {name: 'destinationAddress', parameterType: 'ADDRESS_WITH_TYPE_DEPENDENCY'}, // <destination address:uint16_t or uint64_t>
+            {
+                name: 'destinationAddress',
+                parameterType: 'ADDRESS_WITH_TYPE_DEPENDENCY'
+            }, // <destination address:uint16_t or uint64_t>
             {name: 'destinationEndpoint', parameterType: 'UINT8'}, // <destination endpoint (
             // value ignored for group address): uint8_t>
         ],
@@ -402,11 +406,14 @@ export const ZiGateCommand: { [key: string]: ZiGateCommandType } = {
     },
     [ZiGateCommandCode.UnBind]: {
         request: [
-            {name: 'targetExtendedAddress', parameterType: 'IEEEADR'}, // <target extended address: uint64_t>
+            {name: 'targetExtendedAddress', parameterType: 'IEEEADDR'}, // <target extended address: uint64_t>
             {name: 'targetEndpoint', parameterType: 'UINT8'}, // <target endpoint: uint8_t>
             {name: 'clusterID', parameterType: 'UINT16BE'}, // <cluster ID: uint16_t>
             {name: 'destinationAddressMode', parameterType: 'UINT8'}, // <destination address mode: uint8_t>
-            {name: 'destinationAddress', parameterType: 'ADDRESS_WITH_TYPE_DEPENDENCY'}, // <destination address:uint16_t or uint64_t>
+            {
+                name: 'destinationAddress',
+                parameterType: 'ADDRESS_WITH_TYPE_DEPENDENCY'
+            }, // <destination address:uint16_t or uint64_t>
             {name: 'destinationEndpoint', parameterType: 'UINT8'}, // <destination endpoint (
             // value ignored for group address): uint8_t>
         ],

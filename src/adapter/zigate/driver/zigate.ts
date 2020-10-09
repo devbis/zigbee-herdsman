@@ -90,6 +90,7 @@ export default class ZiGate extends EventEmitter {
 
                 const ziGateObject = ZiGateObject.createRequest(code, payload);
                 const frame = ziGateObject.toZiGateFrame();
+                debug.log('Send command buff: ', frame);
 
                 const sendBuffer = frame.toBuffer();
                 debug.log('Send command buff: ', sendBuffer);
@@ -281,41 +282,27 @@ export default class ZiGate extends EventEmitter {
 
                 if (ziGateObject === undefined)
                     return;
-                // debug.log(ziGateObject.payload, frame.readRSSI());
                 this.waitress.resolve(ziGateObject);
 
                 if (code !== ZiGateMessageCode.Status || ziGateObject.payload.status !== 0) {
                     debug.info(`--> frame to object `, ziGateObject.payload);
                 }
                 if (code === ZiGateMessageCode.DataIndication) {
-                    debug.info('raw');
 
-                    let zclFrame = null;
-                    switch (ziGateObject.payload.clusterID) {
-                        case 0x8005:
-                            // @ts-ignore
-                            zclFrame = ZiGateObject.fromBufer(0x8005, ziGateObject.payload.payload);
-                            break;
-                        default:
-                            try {
-                                // @ts-ignore
-                                zclFrame = ZclFrame.fromBuffer(ziGateObject.payload.clusterID,
-                                    ziGateObject.payload.payload);
-                            } catch (e) {
-                                zclFrame = null;
-                            }
-                    }
+                    const zclFrame = ZclFrame.fromBuffer(
+                        // @ts-ignore
+                        ziGateObject.payload.clusterID,
+                        ziGateObject.payload.payload
+                    );
+                    debug.info('raw', zclFrame);
 
                     this.emit('received', {ziGateObject, zclFrame});
                 } else if (code === ZiGateMessageCode.LeaveIndication) {
-                    debug.log('raw leave');
                     this.emit('LeaveIndication', {ziGateObject});
                 } else if (code === ZiGateMessageCode.DeviceAnnounce) {
-                    debug.log('raw announce');
                     this.emit('DeviceAnnounce', {ziGateObject});
                 }
             } catch (error) {
-
                 this.emit('receivedRaw', {error, frame});
                 // debug.error(`'${error.stack}'`);
             }

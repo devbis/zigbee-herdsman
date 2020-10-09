@@ -158,8 +158,9 @@ class ZiGateAdapter extends Adapter {
             debug.log("well connected to zigate key.", arguments);
             // await this.driver.sendCommand(ZiGateCommandCode.SetDeviceType, {deviceType: 0});
 
-            // await this.driver.sendCommand(ZiGateCommandCode.RawMode, {enabled: 0x01}); // Включаем raw mode
-            await this.driver.sendCommand(ZiGateCommandCode.RawMode, {enabled: 0x02}); //  raw hybrid mode
+            // await this.reset('hard');
+            await this.driver.sendCommand(ZiGateCommandCode.RawMode, {enabled: 0x01}); // Включаем raw mode
+            // await this.driver.sendCommand(ZiGateCommandCode.RawMode, {enabled: 0x02}); //  raw hybrid mode
 
             await this.initNetwork();
         } catch(error) {
@@ -186,7 +187,7 @@ class ZiGateAdapter extends Adapter {
 
     public async getCoordinator(): Promise<TsType.Coordinator> {
         debug.log('getCoordinator', arguments)
-        // const networkResponse: any = await this.driver.sendCommand(ZiGateCommandCode.StartNetwork);
+        const networkResponse: any = await this.driver.sendCommand(ZiGateCommandCode.GetNetworkState);
 
         const endpoints: any = [
             {
@@ -263,12 +264,14 @@ class ZiGateAdapter extends Adapter {
                     0x1000
                 ]
             }];
-        return {
-            ieeeAddr: '',//networkResponse.extendedAddress,
-            networkAddress: 0,//networkResponse.shortAddress,
+        const response: TsType.Coordinator = {
+            networkAddress: 0,
             manufacturerID: 0,
+            ieeeAddr: networkResponse.payload.extendedAddress,
             endpoints,
         };
+        debug.log('getCoordinator', response)
+        return response;
 
     };
 
@@ -499,13 +502,13 @@ class ZiGateAdapter extends Adapter {
         clusterID: number, destinationAddressOrGroup: string | number, type: 'endpoint' | 'group',
         destinationEndpoint?: number
     ): Promise<void> {
-
+        debug.error('bind', arguments);
         let payload = {
             targetExtendedAddress: sourceIeeeAddress,
             targetEndpoint: sourceEndpoint,
             clusterID: clusterID,
-            destinationAddressMode: (type === 'group') ? 0x01 : 0x02,
-            destinationAddress: destinationNetworkAddress,
+            destinationAddressMode: (type === 'group') ? 0x01 : 0x03,
+            destinationAddress: destinationAddressOrGroup,
         };
 
         if (typeof destinationEndpoint !== undefined) {
@@ -522,7 +525,20 @@ class ZiGateAdapter extends Adapter {
         clusterID: number, destinationAddressOrGroup: string | number, type: 'endpoint' | 'group',
         destinationEndpoint: number
     ): Promise<void> {
-        debug.log('unbind', arguments)
+        debug.error('unbind', arguments);
+        let payload = {
+            targetExtendedAddress: sourceIeeeAddress,
+            targetEndpoint: sourceEndpoint,
+            clusterID: clusterID,
+            destinationAddressMode: (type === 'group') ? 0x01 : 0x03,
+            destinationAddress: destinationAddressOrGroup,
+        };
+
+        if (typeof destinationEndpoint !== undefined) {
+            // @ts-ignore
+            payload['destinationEndpoint'] = destinationEndpoint
+        }
+        const result = this.driver.sendCommand(ZiGateCommandCode.UnBind, payload);
         return
     };
 
