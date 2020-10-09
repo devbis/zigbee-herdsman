@@ -543,8 +543,19 @@ class ZiGateAdapter extends Adapter {
     };
 
     public removeDevice(networkAddress: number, ieeeAddr: string): Promise<void> {
-        debug.log('removeDevice', arguments)
-        return
+        const payload = {
+            targetShortAddress: networkAddress,
+            extendedAddress: ieeeAddr
+        };
+        return this.driver.sendCommand(ZiGateCommandCode.RemoveDevice, payload).then(
+            () => {
+                return Promise.resolve();
+            }
+        ).catch(
+            () => {
+                return Promise.reject();
+            }
+        )
     };
 
     /**
