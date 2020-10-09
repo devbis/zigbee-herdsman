@@ -46,7 +46,10 @@ export const ZiGateMessage: { [k: number]: ZiGateMessageType } = {
             // Packet Type: The value of the initiating command request.
             {name: 'sequence', parameterType: 'UINT8'}, // <sequence number: uint8_t>
             {name: 'packetType', parameterType: 'UINT16BE'}, // <Packet Type: uint16_t>
-            {name: 'rawError', parameterType: 'BUFFER'}, // <Packet Type: uint16_t>
+            {name: 'requestSent', parameterType: 'UINT8'},// <requestSent: uint8_t>  - 1 if a request been sent to
+            // a device(aps ack/nack 8011 should be expected) , 0 otherwise
+            {name: 'seqApsNum', parameterType: 'UINT8'},// <seqApsNum: uint8_t>  - sqn of the APS layer - used to
+            // check sqn sent back in aps ack
         ]
     },
     [ZiGateMessageCode.PermitJoinStatus]: {
