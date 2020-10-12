@@ -25,6 +25,20 @@ class BuffaloZiGate extends Buffalo {
         }
     }
 
+    private static addressBufferToStringBE(buffer: Buffer): string {
+        let address = '0x';
+        for (let i = 0; i < buffer.length; i++) {
+            const value = buffer.readUInt8(i);
+            if (value <= 15) {
+                address += '0' + value.toString(16);
+            } else {
+                address += value.toString(16);
+            }
+        }
+
+        return address;
+    }
+
     public read(type: string, options: BuffaloZiGateOptions): TsType.Value {
 
         if (type === 'MACCAPABILITY') {
@@ -51,6 +65,8 @@ class BuffaloZiGate extends Buffalo {
             return this.readUInt16BE();
         } else if (type === 'UINT32BE') {
             return this.readUInt32BE();
+        } else if (type === 'IEEADDR') {
+            return this.readIeeeAddr();
         } else if (type === 'ADDRESS_WITH_TYPE_DEPENDENCY') {
             // 		rep.addressSourceMode = Enum.ADDRESS_MODE(reader.nextUInt8());
             // 		rep.addressSource = rep.addressSourceMode.name === 'short' ?
@@ -67,6 +83,12 @@ class BuffaloZiGate extends Buffalo {
         }
     }
 
+    public readIeeeAddr(): Value {
+        const length = 8;
+        const value = this.buffer.slice(this.position, this.position + length);
+        this.position += length;
+        return BuffaloZiGate.addressBufferToStringBE(value);
+    }
 
     public readUInt16BE(): Value {
         const value = this.buffer.readUInt16BE(this.position);
