@@ -156,7 +156,7 @@ class ZiGateAdapter extends Adapter {
         await this.driver.open();
         try {
             debug.log("well connected to zigate key.", arguments);
-            // await this.driver.sendCommand(ZiGateCommandCode.SetDeviceType, {deviceType: 0});
+            await this.driver.sendCommand(ZiGateCommandCode.SetDeviceType, {deviceType: 0});
 
             // await this.reset('hard');
             await this.driver.sendCommand(ZiGateCommandCode.RawMode, {enabled: 0x01}); // Включаем raw mode
