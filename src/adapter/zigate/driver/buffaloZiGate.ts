@@ -15,7 +15,9 @@ class BuffaloZiGate extends Buffalo {
             this.writeUInt16BE(value);
         } else if (type === 'UINT32BE') {
             this.writeUInt32BE(value);
-        } else if (type === 'ADDRESS_WITH_TYPE_DEPENDENCY') {
+        } else if (type === 'IEEADDR') {
+            return this.readIeeeAddr();
+        }else if (type === 'ADDRESS_WITH_TYPE_DEPENDENCY') {
             const addressMode = this.buffer.readUInt8(this.position - 1);
             return addressMode == 3 ? this.writeIeeeAddr(value) : this.writeUInt16BE(value);
         } else if (type === 'BUFFER' && (Buffer.isBuffer(value) || IsNumberArray(value))) {
@@ -81,6 +83,11 @@ class BuffaloZiGate extends Buffalo {
         } else {
             return super.read(type, options);
         }
+    }
+
+    public writeIeeeAddr(value: string): void {
+        this.writeUInt32BE(parseInt(value.slice(2, 10), 16));
+        this.writeUInt32BE(parseInt(value.slice(10), 16));
     }
 
     public readIeeeAddr(): Value {
