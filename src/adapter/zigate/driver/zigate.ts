@@ -11,7 +11,7 @@ import {ZiGateCommandCode, ZiGateMessageCode, ZiGateObjectPayload} from "./const
 import ZiGateObject from "./ziGateObject";
 import {ZclFrame} from "../../../zcl";
 import Waitress from "../../../utils/waitress";
-import {ZiGateResponseMatcher, ZiGateResponseMatcherRule} from "./commandType";
+import {equal, ZiGateResponseMatcher, ZiGateResponseMatcherRule} from "./commandType";
 
 const debug = Debug('driver');
 
@@ -76,9 +76,10 @@ export default class ZiGate extends EventEmitter {
         code: ZiGateCommandCode,
         payload?: ZiGateObjectPayload,
         timeout?: number
-    ): Promise<ZiGateObject> { // @TODO ?
-        // const argument = arguments;
-        return this.queue.execute(async () => {
+    ): Promise<ZiGateObject> {
+
+        const waiters: Promise<ZiGateObject>[] = [];
+        const statusResponse: ZiGateObject = await this.queue.execute(async () => {
             try {
                 debug.log(
                     'Send command \x1b[42m>>>> '
@@ -96,24 +97,45 @@ export default class ZiGate extends EventEmitter {
                 debug.log('Send command buff: ', sendBuffer);
 
 
-                const waiters: Promise<ZiGateObject>[] = [];
-                ziGateObject.command.response.forEach((rules) => {
-                    waiters.push(
-                        this.waitress.waitFor({ziGateObject, rules}, timeout || timeouts.default
-                        ).start().promise);
-                });
+                if (Array.isArray(ziGateObject.command.response)) {
+                    ziGateObject.command.response.forEach((rules) => {
+                        waiters.push(
+                            this.waitress.waitFor({ziGateObject, rules}, timeout || timeouts.default
+                            ).start().promise);
+                    });
+
+                }
+
+                const ruleStatus: ZiGateResponseMatcher = [
+                    {receivedProperty: 'code', matcher: equal, value: ZiGateMessageCode.Status},
+                    {receivedProperty: 'payload.packetType', matcher: equal, value: ziGateObject.code},
+                ];
+
+                const statusWaiter = this.waitress.waitFor(
+                    {ziGateObject, rules: ruleStatus},
+                    timeout || timeouts.default
+                ).start();
 
                 // @ts-ignore
                 this.portWrite.write(sendBuffer);
 
-                return Promise.race(waiters);
+                return statusWaiter.promise;
             } catch (e) {
                 debug.error(e);
-                return new Promise((resolve, reject) => {
-                    reject();
-                });
+                return Promise.reject();
             }
         });
+
+        if (statusResponse.payload.status === 0) {
+            if (waiters.length > 0) {
+                return Promise.race(waiters);
+            } else {
+                return Promise.resolve(statusResponse);
+            }
+        }
+
+        // else
+        return Promise.reject(statusResponse);
     }
 
     public static async isValidPath(path: string): Promise<boolean> {
