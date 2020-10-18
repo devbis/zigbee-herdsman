@@ -155,7 +155,7 @@ class ZiGateAdapter extends Adapter {
         // открываем адаптер, пробуем пингануть
         await this.driver.open();
         try {
-            debug.log("well connected to zigate key.", arguments);
+            debug.log("connected to zigate adapter successfully.", arguments);
             await this.driver.sendCommand(ZiGateCommandCode.SetDeviceType, {deviceType: 0});
 
             // await this.reset('hard');
@@ -164,7 +164,7 @@ class ZiGateAdapter extends Adapter {
 
             await this.initNetwork();
         } catch(error) {
-            debug.error("dont connected to zigate key");
+            debug.error("failed to connect to zigate adapter");
             debug.error(error);
         }
 
