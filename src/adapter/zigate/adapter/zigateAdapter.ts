@@ -1,15 +1,23 @@
 /* istanbul ignore file */
 /* eslint-disable */
 import * as TsType from '../../tstype';
-import {DeviceType} from '../../tstype';
+import {DeviceType, LQI, LQINeighbor} from '../../tstype';
 import * as Events from '../../events';
 import Adapter from '../../adapter';
 import {Direction, FrameType, ZclFrame} from '../../../zcl';
 import {Queue, Waitress} from '../../../utils';
 import Driver from '../driver/zigate';
 import {Debug} from "../debug";
-import {ZiGateCommandCode, ZPSNwkKeyState} from "../driver/constants";
-import {RawAPSDataRequestPayload} from "../driver/commandType";
+import {
+    ZiGateCommandCode,
+    ZiGateMessageCode, ZiGateObjectPayload,
+    ZPSNwkKeyState
+} from "../driver/constants";
+import {
+    equal,
+    RawAPSDataRequestPayload,
+    ZiGateResponseMatcher
+} from "../driver/commandType";
 import ZiGateObject from "../driver/ziGateObject";
 
 const debug = Debug('adapter');
@@ -358,12 +366,80 @@ class ZiGateAdapter extends Adapter {
     };
 
     public async lqi(networkAddress: number): Promise<TsType.LQI> {
-        debug.log('lqi', arguments)
+        const neighbors: LQINeighbor[] = [];
 
-        const resultPayload = await this.driver.sendCommand(ZiGateCommandCode.ManagementLQI,
-            {targetAddress: networkAddress, startIndex: 0}
-        );
-        return
+        const add = (list: any) => {
+            for (const entry of list) {
+                const relationByte = entry.readUInt8(18);
+                const extAddr: number[] = [];
+                for (let i = 8; i < 16; i++) {
+                    extAddr.push(entry[i]);
+                }
+
+                neighbors.push({
+                    linkquality: entry.readUInt8(21),
+                    networkAddress: entry.readUInt16LE(16),
+                    ieeeAddr: `0x${Buffer.from(extAddr).toString('hex')}`,
+                    relationship: (relationByte >> 1) & ((1 << 3)-1),
+                    depth: entry.readUInt8(20)
+                });
+            }
+        };
+
+        const request = async (startIndex: number): Promise<any> => {
+            try {
+                const result = await this.driver.sendCommand(
+                    ZiGateCommandCode.ManagementLQI,
+                    {targetAddress: networkAddress, startIndex},
+                );
+                debug.info(`LQI result: ${result}`)
+                const data = <number[]>result.payload.payload;
+
+                if (data[1] !== 0) { // status
+                    throw new Error(`LQI for '${networkAddress}' failed`);
+                }
+                const tableList: Buffer[] = [];
+                const response = {
+                    status: data[1],
+                    tableEntrys: data[2],
+                    startIndex: data[3],
+                    tableListCount: <number>data[4],
+                    tableList: tableList
+                }
+
+                let tableEntry: number[] = [];
+                let counter = 0;
+                for (let i = 5; i < ((response.tableListCount * 22) + 5); i++) { // one tableentry = 22 bytes
+                    tableEntry.push(<number>data[i]);
+                    counter++;
+                    if (counter === 22) {
+                        response.tableList.push(Buffer.from(tableEntry));
+                        tableEntry = [];
+                        counter = 0;
+                    }
+                }
+
+                debug.info("LQI RESPONSE - addr: 0x" + networkAddress.toString(16) + " result: " + response.status + " read " + (response.tableListCount + response.startIndex) + "/" + response.tableEntrys + " entrys");
+                return response;
+            } catch (error) {
+                debug.error("LQI REQUEST FAILED - addr: 0x" + networkAddress.toString(16) + " " + JSON.stringify(error));
+                debug.info(error)
+                return Promise.reject();
+            }
+        };
+        debug.info('networkAddress: ' + networkAddress)
+
+        let response = await request(0);
+        add(response.tableList);
+        let nextStartIndex = response.tableListCount;
+
+        while (neighbors.length < response.tableEntrys) {
+            response = await request(nextStartIndex);
+            add(response.tableList);
+            nextStartIndex += response.tableListCount;
+        }
+
+        return {neighbors};
     };
 
     public routingTable(networkAddress: number): Promise<TsType.RoutingTable> {

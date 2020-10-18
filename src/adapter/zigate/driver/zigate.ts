@@ -310,15 +310,19 @@ export default class ZiGate extends EventEmitter {
                     debug.info(`--> frame to object `, ziGateObject.payload);
                 }
                 if (code === ZiGateMessageCode.DataIndication) {
-
-                    const zclFrame = ZclFrame.fromBuffer(
-                        // @ts-ignore
-                        ziGateObject.payload.clusterID,
-                        ziGateObject.payload.payload
-                    );
-                    debug.info('raw', zclFrame);
-
-                    this.emit('received', {ziGateObject, zclFrame});
+                    const {clusterID, payload} = ziGateObject.payload;
+                    try {
+                        const zclFrame = ZclFrame.fromBuffer(
+                            <number>clusterID,
+                            <Buffer>payload,
+                        );
+                        debug.info('raw', zclFrame);
+                        this.emit('received', {ziGateObject, zclFrame});
+                    } catch (e) {
+                        // non-ZCL data
+                        debug.info(ziGateObject.payload);
+                        this.emit('received', {ziGateObject, payload});
+                    }
                 } else if (code === ZiGateMessageCode.LeaveIndication) {
                     this.emit('LeaveIndication', {ziGateObject});
                 } else if (code === ZiGateMessageCode.DeviceAnnounce) {

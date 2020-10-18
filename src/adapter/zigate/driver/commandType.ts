@@ -108,7 +108,8 @@ export const ZiGateCommand: { [key: string]: ZiGateCommandType } = {
         ],
         response: [
             [
-                {receivedProperty: 'code', matcher: equal, value: ZiGateMessageCode.ManagementLQIResponse},
+                {receivedProperty: 'code', matcher: equal, value: ZiGateMessageCode.DataIndication},
+                {receivedProperty: 'payload.clusterID', matcher: equal, value: ZiGateMessageCode.LQIResponse}
             ],
         ]
     },

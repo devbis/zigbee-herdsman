@@ -229,6 +229,7 @@ export enum ZiGateMessageCode {
     VersionList = 0x8010,
     APSDataConfirm = 0x8011,
     NetworkJoined = 0x8024,
+    LQIResponse = 0x8031,
     LeaveIndication = 0x8048,
     RouterDiscoveryConfirm = 0x8701,
     APSDataConfirmFail = 0x8702,
