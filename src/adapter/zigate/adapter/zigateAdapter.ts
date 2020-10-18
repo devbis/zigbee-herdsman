@@ -277,7 +277,6 @@ class ZiGateAdapter extends Adapter {
 
     public async getCoordinatorVersion(): Promise<TsType.CoordinatorVersion> {
         debug.log('getCoordinatorVersion', arguments)
-        // @ts-ignore
         const result: ZiGateObject = await this.driver.sendCommand(ZiGateCommandCode.GetVersion, {});
         const version: TsType.CoordinatorVersion = {
             type: 'zigate',
@@ -637,7 +636,7 @@ class ZiGateAdapter extends Adapter {
             securityMode: 0,
             radius: 0,
             dataLength: pay.length,
-            data: pay,
+            data: [...pay],
         }
         debug.log('sendZclFrameToAll', payload)
 
