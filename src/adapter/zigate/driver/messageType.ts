@@ -86,6 +86,28 @@ export const ZiGateMessage: {[k: number]: ZiGateMessageType} = {
             // uint8_t>
         ],
     },
+    [ZiGateMessageCode.GreenPowerDataIndication]: {
+        response: [
+            {name: "status", parameterType: ParameterType.UINT8},
+            {name: "sequenceNumber", parameterType: ParameterType.UINT8},
+            {name: "applicationId", parameterType: ParameterType.UINT8},
+            {name: "securityLevel", parameterType: ParameterType.UINT8},
+            {name: "securityKeyType", parameterType: ParameterType.UINT8},
+            {name: "autoCommissioning", parameterType: ParameterType.UINT8},
+            {name: "rxAfterTx", parameterType: ParameterType.UINT8},
+            {name: "frameType", parameterType: ParameterType.UINT8},
+            {name: "sourceAddressMode", parameterType: ParameterType.UINT8},
+            {name: "rssi", parameterType: ParameterType.UINT8},
+            {name: "linkQuality", parameterType: ParameterType.UINT8},
+            {name: "sourcePanID", parameterType: ParameterType.UINT16},
+            {name: "sourceID", parameterType: ParameterType.UINT32},
+            {name: "frameCounter", parameterType: ParameterType.UINT32},
+            {name: "mic", parameterType: ParameterType.UINT32},
+            {name: "commandId", parameterType: ParameterType.UINT8},
+            {name: "payloadLength", parameterType: ParameterType.UINT8},
+            {name: "payload", parameterType: ParameterType.BUFFER_RAW},
+        ],
+    },
     [ZiGateMessageCode.NodeClusterList]: {
         response: [
             {name: "sourceEndpoint", parameterType: ParameterType.UINT8}, //<source endpoint: uint8_t t>

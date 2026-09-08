@@ -197,6 +197,7 @@ export enum ZiGateMessageCode {
     RouterDiscoveryConfirm = 0x8701,
     PermitJoinStatus = 0x8014,
     GetTimeServer = 0x8017,
+    GreenPowerDataIndication = 0x8018,
     ManagementLQIResponse = 0x804e,
     ManagementLeaveResponse = 0x8047,
     PDMEvent = 0x8035,

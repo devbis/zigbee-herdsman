@@ -535,7 +535,26 @@ export class ZiGateAdapter extends Adapter {
             };
             logger.debug(() => `sendZclFrameToAll ${JSON.stringify(payload)}`, NS);
 
-            await this.driver.sendCommand(ZiGateCommandCode.RawAPSDataRequest, payload, undefined, {}, true);
+            try {
+                await this.driver.sendCommand(ZiGateCommandCode.RawAPSDataRequest, payload, undefined, {}, true);
+            } catch (error) {
+                const isGreenPowerPairing =
+                    sourceEndpoint === ZSpec.GP_ENDPOINT &&
+                    payload.profileID === ZSpec.GP_PROFILE_ID &&
+                    payload.clusterID === Zcl.Clusters.greenPower.ID &&
+                    zclFrame.header.commandIdentifier === Zcl.Clusters.greenPower.commands.pairing.ID;
+
+                if (!isGreenPowerPairing) {
+                    throw error;
+                }
+
+                // This ZiGate GP proxy is receive-only.  It can deliver the
+                // GPDF to z2m, but its generic APS command path rejects the
+                // pairing notification.  Pairing is optional for this path:
+                // the common controller still creates the GPD and can handle
+                // subsequent notifications.
+                logger.debug(() => `GP pairing transmission is unavailable: ${error}`, NS);
+            }
             await wait(200);
         });
     }
@@ -673,6 +692,11 @@ export class ZiGateAdapter extends Adapter {
     }
 
     private dataListener(ziGateObject: ZiGateObject): void {
+        if (ziGateObject.code === ZiGateMessageCode.GreenPowerDataIndication) {
+            this.greenPowerDataListener(ziGateObject);
+            return;
+        }
+
         const payload: Events.ZclPayload = {
             address: <number>ziGateObject.payload.sourceAddress,
             clusterID: ziGateObject.payload.clusterID,
@@ -684,6 +708,83 @@ export class ZiGateAdapter extends Adapter {
             groupID: 0, // @todo
             wasBroadcast: false, // TODO
             destinationEndpoint: <number>ziGateObject.payload.destinationEndpoint,
+        };
+
+        if (payload.header !== undefined) {
+            this.waitress.resolve(payload as ZclWaitressPayload);
+        }
+
+        this.emit("zclPayload", payload);
+    }
+
+    /**
+     * Convert ZiGate's native GP indication to the canonical GP ZCL frame.
+     *
+     * The firmware reports the fields decoded by the GP proxy rather than
+     * pretending that a GPDF was an ordinary APS packet.  This is the same
+     * normalization used by the Ember and deCONZ adapters, and lets the
+     * common Green Power controller handle commissioning and commands.
+     */
+    private greenPowerDataListener(ziGateObject: ZiGateObject): void {
+        const indication = ziGateObject.payload;
+        const commandPayload = indication.payload as Buffer;
+
+        // The proxy status describes the coordinator's security processing.  It
+        // is not part of the GP ZCL payload and must not hide a valid raw GPDF
+        // from the common Green Power controller.  This is particularly useful
+        // for commissioning frames, where the GPD key is learned by z2m.
+        if (indication.status !== 0) {
+            logger.debug(() => `GP indication reports status=${indication.status}`, NS);
+        }
+
+        if (indication.applicationId !== 0) {
+            logger.debug(() => `Dropping GP indication with unsupported applicationId=${indication.applicationId}`, NS);
+            return;
+        }
+
+        if (indication.payloadLength !== commandPayload.length) {
+            logger.debug(
+                () => `Dropping malformed GP indication: declared payload ${indication.payloadLength}, received ${commandPayload.length}`,
+                NS,
+            );
+            return;
+        }
+
+        const isCommissioning = indication.commandId === 0xe0;
+        const options = isCommissioning
+            ? (indication.applicationId & 0x7) |
+              ((indication.rxAfterTx & 0x1) << 3) |
+              ((indication.securityLevel & 0x3) << 4) |
+              ((indication.securityKeyType & 0x7) << 6)
+            : (indication.applicationId & 0x7) |
+              ((indication.securityLevel & 0x3) << 6) |
+              ((indication.securityKeyType & 0x7) << 8) |
+              ((indication.rxAfterTx & 0x1) << 11);
+
+        const gpFrame = Buffer.alloc(15 + commandPayload.length);
+        gpFrame.writeUInt8(0x01, 0);
+        gpFrame.writeUInt8(indication.sequenceNumber, 1);
+        gpFrame.writeUInt8(
+            isCommissioning ? Zcl.Clusters.greenPower.commands.commissioningNotification.ID : Zcl.Clusters.greenPower.commands.notification.ID,
+            2,
+        );
+        gpFrame.writeUInt16LE(options, 3);
+        gpFrame.writeUInt32LE(indication.sourceID, 5);
+        gpFrame.writeUInt32LE(indication.frameCounter, 9);
+        gpFrame.writeUInt8(indication.commandId, 13);
+        gpFrame.writeUInt8(commandPayload.length, 14);
+        commandPayload.copy(gpFrame, 15);
+
+        const payload: Events.ZclPayload = {
+            header: Zcl.Header.fromBuffer(gpFrame),
+            data: gpFrame,
+            clusterID: Zcl.Clusters.greenPower.ID,
+            address: indication.sourceID & 0xffff,
+            endpoint: ZSpec.GP_ENDPOINT,
+            linkquality: indication.linkQuality,
+            groupID: ZSpec.GP_GROUP_ID,
+            wasBroadcast: true,
+            destinationEndpoint: ZSpec.GP_ENDPOINT,
         };
 
         if (payload.header !== undefined) {

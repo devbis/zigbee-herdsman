@@ -365,6 +365,8 @@ export default class ZiGate extends EventEmitter<ZiGateEventMap> {
                         } else {
                             logger.debug(`not implemented profile: ${ziGateObject.payload.profileID}`, NS);
                         }
+                    } else if (code === ZiGateMessageCode.GreenPowerDataIndication) {
+                        this.emit("received", ziGateObject);
                     } else if (code === ZiGateMessageCode.DeviceAnnounce) {
                         this.emit("DeviceAnnounce", {
                             nwkAddress: ziGateObject.payload.shortAddress,
